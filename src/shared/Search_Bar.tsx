@@ -1,7 +1,7 @@
-//
-// Строка поиска расписания по группе, кафедре или преподавателю
-//
+// //
+// // Строка поиска канала (пользователя) ????????
+// //
 
-export default function Search_Bar() {
-    return <input className="search-bar" placeholder="Искать расписание..."></input>
-}
+// export default function Search_Bar() {
+//     return <input className="search-bar" placeholder="Искать расписание..."></input>
+// }

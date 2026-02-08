@@ -13,7 +13,7 @@ export default function App() {
         <Routes>
             <Route path='/' element={<Layout />}>
                 <Route index element={<Main_Page/>}/>
-                <Route path='/personal_account' element={<Personal_Account_Page/>}/>
+                <Route path='/person_acc' element={<Personal_Account_Page/>}/>
             </Route>
         </Routes>
     </>
