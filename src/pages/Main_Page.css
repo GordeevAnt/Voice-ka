@@ -1,0 +1,22 @@
+.chanel-container {
+    display: flex;
+    flex-direction: row;
+    flex: 1; /* Занимает всё пространство app-container */
+    width: 100%; /* Явно указываем ширину */
+}
+
+.room-container {
+    background-color: #530a8f; /* ! */
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 300px;
+}
+
+.settings {
+    background-color: #009dbd; /* ! */
+    display: flex;
+    flex-direction: row;
+    gap: 4px;
+    padding: 8px; /* Для наглядности */
+}

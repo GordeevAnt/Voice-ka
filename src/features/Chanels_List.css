@@ -1,4 +1,27 @@
 .chanels-list {
+    background-color: #09bd00; /* ! */
+    height: 60px;
+    align-items: center;
     display: flex;
     flex-direction: row;
+    justify-content: center;
+    gap: 40px /* ! */
+}
+
+/* .chanels-list.small {
+    gap: 40px
+}
+
+.chanels-list.medium {
+    gap: 40px
+}
+
+.chanels-list.large {
+    gap: 40px
+} */
+
+.chanel-list-changer {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
 }

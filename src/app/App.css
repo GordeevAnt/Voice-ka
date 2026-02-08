@@ -1,13 +1,16 @@
 body {
     margin: 0;
-    min-height: 100vh; /* Минимальная высота - весь экран */
+    height: 100vh; /* Важно для % высоты */
+}
+
+#root {
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
 }
 
-.body_content {
+.app-container {
     margin-top: 32px;
-    margin-bottom: 0;
-    width: 100%;
-    flex: 1;
+    flex: 1; /* Занимает всё доступное пространство */
+    display: flex; /* Добавляем flex */
 }

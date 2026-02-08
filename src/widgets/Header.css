@@ -110,6 +110,5 @@ color: #ffffff; */
 }
 
 .titlebar-btn.close:hover {
-  background: #ff0d00;
-  /* color: white; */
+  background: #ff0000;
 }

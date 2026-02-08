@@ -1,0 +1,6 @@
+.messenger-field {
+    flex: 1; /* Занимает всё оставшееся пространство */
+    background-color: #ff005d;
+    padding: 20px;
+    min-width: 0; /* Важно для правильного сжатия в flex */
+}

@@ -1,9 +1,15 @@
 //
-// Виджет для добавления канала (подписка или избранное)
+// Кнопка для добавления канала
+//
+// 1. Подписка
+// Добавляет канал в подписки
+//
+// 2. Избранное
+// Добавляет канал в избранное
 //
 
 export default function Add_Chanel() {
-    return <div className="add">
+    return <button className="add-chanel-btn">
         +
-    </div>
+    </button>
 }

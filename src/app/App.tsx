@@ -1,7 +1,7 @@
 import { Route, Routes } from "react-router-dom";
+import Layout from "./Layout";
 import Main_Page from "../pages/Main_Page";
 import Personal_Account_Page from "../pages/Personal_Account_Page";
-import Layout from "./Layout";
 
 //
 // Компонент для маршрутизации

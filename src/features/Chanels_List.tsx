@@ -1,12 +1,29 @@
+import Chanel_Button from "../shared/Chanel_Button"
 import Add_Chanel from "../shared/Add_Chanel"
+
+import "./Chanels_List.css"
 
 //
 // Виджет вывода списка комнат канала
 //
 
 export default function Chanels_List() {
-    return <div className="chanels-list">
-        Список каналов
+    return <footer className="chanels-list small">
+
+        <div className="chanel-list-changer">
+            <button className="sub-chanel-btn">Подписки</button>
+            <button className="fav-chanel-btn">Избранное</button>
+        </div>
+        
+        <div className="chanel-list">
+            <Chanel_Button />
+            <Chanel_Button />
+            <Chanel_Button />
+            <Chanel_Button />
+            <Chanel_Button />
+        </div>
+        
         <Add_Chanel />
-    </div>
+        
+    </footer>
 }
