@@ -1,3 +1,7 @@
+hmtl, body {
+    overflow: hidden !important;
+}
+
 body {
     margin: 0;
     height: 100vh; /* Важно для % высоты */

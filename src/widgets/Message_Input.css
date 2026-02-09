@@ -1,0 +1,9 @@
+.message-input-block {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+#message-input {
+    width: 76%;
+}

@@ -1,30 +1,36 @@
-.rooms-list-block {
+.rooms-online-list-block {
     background-color: #530a8f; /* ! */
-    margin-right: 3px;
+    max-width: 60px;
     max-height: 881px;
     flex: 1;
     overflow-y: auto;
 }
 
-.rooms-list-block::-webkit-scrollbar {
+.rooms-online-list-block::-webkit-scrollbar {
     margin-left: 20px;
     width: 5px;
 }
 
-.rooms-list-block::-webkit-scrollbar-thumb {
+.rooms-online-list-block::-webkit-scrollbar-thumb {
     border-radius: 15px;
     background-color: black;
 }
 
-.rooms-list-block::-webkit-scrollbar-track {
+.rooms-online-list-block::-webkit-scrollbar-track {
     border-radius: 15px;
     background-color: grey;
 }
 
-.rooms-list {
-    margin-right: 5px;
+.rooms-online-list {
+    margin-right: 1px;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 3px;
+}
+
+.online-user {
+    height: 45px;
+    width: 45px;
+    border-radius: 18px;
 }

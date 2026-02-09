@@ -7,12 +7,32 @@ import "./Rooms_List.css"
 //
 
 export default function Rooms_List() {
-    return <div className="rooms-list">
-        <Room_Button />
-        <Room_Button />
-        <Room_Button />
-        <Room_Button />
-        <Room_Button />
-        <Room_Button />
+    return <div className="rooms-list-block">
+        <div className="rooms-list">
+            <Room_Button />
+            <Room_Button />
+            <Room_Button />
+            <Room_Button />
+            <Room_Button />
+            <Room_Button />
+            <Room_Button />
+            <Room_Button />
+            <Room_Button />
+            <Room_Button />
+            <Room_Button />
+            <Room_Button />
+            <Room_Button />
+            <Room_Button />
+            <Room_Button />
+            <Room_Button />
+            <Room_Button />
+            <Room_Button />
+            <Room_Button />
+            <Room_Button />
+            <Room_Button />
+            <Room_Button />
+            <Room_Button />
+            <Room_Button />
+        </div>
     </div>
 }

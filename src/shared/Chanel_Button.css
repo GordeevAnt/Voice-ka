@@ -1,6 +1,6 @@
 .chanel-btn {
-    height: 50px;
-    width: 50px;
+    min-height: 45px;
+    min-width: 45px;
     border-radius: 100%;
     align-items: center;
 }

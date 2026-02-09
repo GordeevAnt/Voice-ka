@@ -1,0 +1,13 @@
+import "./Message_Input.css"
+
+//
+// Виджет ввода сообщений
+//
+
+export default function Message_Input() {
+    return <div className="message-input-block">
+        <button id="message-smile">Смайлик</button>
+        <input id="message-input" placeholder="Напиши сообщение :)"></input>
+        <button id="message-file">Файл</button>
+    </div>
+}

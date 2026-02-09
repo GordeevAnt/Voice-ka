@@ -8,19 +8,56 @@ import "./Chanels_List.css"
 //
 
 export default function Chanels_List() {
-    return <footer className="chanels-list small">
+    return <footer className="chanels-container">
 
         <div className="chanel-list-changer">
             <button className="sub-chanel-btn">Подписки</button>
             <button className="fav-chanel-btn">Избранное</button>
         </div>
         
-        <div className="chanel-list">
-            <Chanel_Button />
-            <Chanel_Button />
-            <Chanel_Button />
-            <Chanel_Button />
-            <Chanel_Button />
+        <div className="chanel-list-block">
+            <div className="chanel-list">
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+                <Chanel_Button />
+            </div>
         </div>
         
         <Add_Chanel />

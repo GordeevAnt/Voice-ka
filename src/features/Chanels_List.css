@@ -1,4 +1,4 @@
-.chanels-list {
+.chanels-container {
     background-color: #09bd00; /* ! */
     height: 60px;
     align-items: center;
@@ -8,20 +8,38 @@
     gap: 40px /* ! */
 }
 
-/* .chanels-list.small {
-    gap: 40px
-}
-
-.chanels-list.medium {
-    gap: 40px
-}
-
-.chanels-list.large {
-    gap: 40px
-} */
-
 .chanel-list-changer {
     display: flex;
     flex-direction: column;
     justify-content: space-around;
+}
+
+.chanel-list-block {
+    overflow-x: auto;
+    max-width: 70vw;
+    padding-bottom: 3px;
+}
+
+.chanel-list-block::-webkit-scrollbar {
+    display: flex;
+    flex-direction: column;
+    margin-top: 20px;
+    height: 5px;
+}
+
+.chanel-list-block::-webkit-scrollbar-thumb {
+    border-radius: 15px;
+    background-color: black;
+}
+
+.chanel-list-block::-webkit-scrollbar-track {
+    border-radius: 15px;
+    background-color: grey;
+}
+
+.chanel-list {
+    max-width: 70%;
+    display: flex;
+    flex-direction: row;
+    gap: 0.5vw;
 }

@@ -3,6 +3,7 @@ import Chanel_Settings from "../widgets/Chanel_Settings"
 import Room_Settings from "../widgets/Room_Settings"
 import Personal_Settings from "../widgets/Personal_Settings"
 import Rooms_List from "../features/Rooms_List"
+import Rooms_Online_List from "../widgets/Rooms_Online_List"
 
 import "./Main_Page.css"
 
@@ -12,7 +13,7 @@ import "./Main_Page.css"
 
 export default function Main_Page() {
     return (
-        <div className="chanel-container">
+        <div className="main-container">
 
             <Messenger_Field />
             
@@ -24,7 +25,10 @@ export default function Main_Page() {
                     <Personal_Settings />
                 </div>
                 
-                <Rooms_List />
+                <div className="room-selector">
+                    <Rooms_Online_List />
+                    <Rooms_List />
+                </div>
             
             </div>
         

@@ -1,4 +1,4 @@
-.chanel-container {
+.main-container {
     display: flex;
     flex-direction: row;
     flex: 1; /* Занимает всё пространство app-container */
@@ -6,17 +6,26 @@
 }
 
 .room-container {
-    background-color: #530a8f; /* ! */
     display: flex;
     flex-direction: column;
-    gap: 10px;
     min-width: 300px;
 }
 
 .settings {
     background-color: #009dbd; /* ! */
+    min-height: 40px;
     display: flex;
     flex-direction: row;
+    justify-content: space-around;
     gap: 4px;
-    padding: 8px; /* Для наглядности */
+    padding: 8px;
+}
+
+.room-selector {
+    background-color: #a268d1; /* ! */
+    height: 100%;
+    display: flex;
+    flex-direction: row;
+    gap: 5px;
+    padding: 10px 0;
 }

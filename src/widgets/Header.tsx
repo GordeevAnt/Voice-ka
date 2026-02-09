@@ -17,7 +17,7 @@ export default function Header() {
                 
                 <button className="titlebar-btn" id="minimize">–</button>
                 
-                <button className="titlebar-btn" id="maximize">
+                <button className="titlebar-btn" id="switch-window-size">
                     <img src="./public/maximize.svg" />
                 </button>
                 

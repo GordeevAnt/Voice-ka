@@ -1,0 +1,28 @@
+.messages-list-block {
+    overflow-y: auto;
+    max-height: 95vw;
+}
+
+.messages-list-block::-webkit-scrollbar {
+    display: flex;
+    flex-direction: column;
+    margin-left: 20px;
+    width: 5px;
+}
+
+.messages-list-block::-webkit-scrollbar-thumb {
+    border-radius: 15px;
+    background-color: black;
+}
+
+.messages-list-block::-webkit-scrollbar-track {
+    border-radius: 15px;
+    background-color: grey;
+}
+
+.messages-list {
+    margin-right: 5px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
