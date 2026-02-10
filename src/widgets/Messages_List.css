@@ -1,11 +1,9 @@
 .messages-list-block {
+    flex: 1;
     overflow-y: auto;
-    max-height: 95vw;
 }
 
 .messages-list-block::-webkit-scrollbar {
-    display: flex;
-    flex-direction: column;
     margin-left: 20px;
     width: 5px;
 }
@@ -25,4 +23,5 @@
     display: flex;
     flex-direction: column;
     gap: 5px;
+    min-height: min-content; /* Минимальная высота по содержимому */
 }

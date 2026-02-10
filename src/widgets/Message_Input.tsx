@@ -5,9 +5,15 @@ import "./Message_Input.css"
 //
 
 export default function Message_Input() {
-    return <div className="message-input-block">
+    return <div className="message-input-container">
+
         <button id="message-smile">Смайлик</button>
-        <input id="message-input" placeholder="Напиши сообщение :)"></input>
+        
+        <div className="message-input-block">
+            <input id="message-input" placeholder="Напиши сообщение :)"></input>
+            <button className="send-btn">Отправить</button>
+        </div>
+        
         <button id="message-file">Файл</button>
     </div>
 }

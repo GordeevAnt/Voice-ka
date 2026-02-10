@@ -1,7 +1,6 @@
 .rooms-list-block {
     background-color: #530a8f; /* ! */
     margin-right: 3px;
-    max-height: 881px;
     flex: 1;
     overflow-y: auto;
 }

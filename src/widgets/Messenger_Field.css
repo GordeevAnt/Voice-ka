@@ -1,8 +1,9 @@
 .messenger-field {
     display: flex;
     flex-direction: column;
-    flex: 1; /* Занимает всё оставшееся пространство по ширине */ 
-    justify-content: space-between;
+    flex: 1;
+    gap: 20px;
     background-color: #ff005d;
     padding: 20px;
+    overflow: hidden;
 }

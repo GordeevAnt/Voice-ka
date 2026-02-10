@@ -13,7 +13,11 @@
     "windows": [
       {
         "decorations": false,
-        "maximized": true
+        "minWidth": 700,
+        "minHeight": 400,
+        "maxWidth": 1920,
+        "maxHeight": 1080,
+        "resizable": true
       }
     ],
     "security": {

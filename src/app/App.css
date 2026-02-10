@@ -1,20 +1,17 @@
+body {
+    margin: 0;
+}
+
 hmtl, body {
     overflow: hidden !important;
 }
 
-body {
-    margin: 0;
-    height: 100vh; /* Важно для % высоты */
-}
-
 #root {
-    min-height: 100vh;
     display: flex;
     flex-direction: column;
 }
 
 .app-container {
     margin-top: 32px;
-    flex: 1; /* Занимает всё доступное пространство */
-    display: flex; /* Добавляем flex */
+    padding-bottom: 60px;
 }

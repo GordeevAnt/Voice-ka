@@ -1,3 +1,5 @@
+import { getCurrentWindow } from "@tauri-apps/api/window"
+
 import "./Header.css"
 
 //
@@ -5,6 +7,9 @@ import "./Header.css"
 //
 
 export default function Header() {
+
+    const appWindow = getCurrentWindow();
+
     return (
     <>
         <div className="titlebar" data-tauri-drag-region>
@@ -15,13 +20,13 @@ export default function Header() {
             
             <div className="titlebar-controls">
                 
-                <button className="titlebar-btn" id="minimize">–</button>
+                <button className="titlebar-btn" id="titlebar-minimize" onClick={() => appWindow.minimize()}>–</button>
                 
-                <button className="titlebar-btn" id="switch-window-size">
+                <button className="titlebar-btn" id="titlebar-switch-window-size" onClick={() => appWindow.toggleMaximize()}>
                     <img src="./public/maximize.svg" />
                 </button>
                 
-                <button className="titlebar-btn close" id="close">
+                <button className="titlebar-btn close" id="titlebar-close" onClick={() => appWindow.close()}>
                     <img src="./public/close.svg" />
                 </button>
             

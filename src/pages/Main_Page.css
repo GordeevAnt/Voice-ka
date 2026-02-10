@@ -1,19 +1,23 @@
 .main-container {
+    height: 100vh;
+    max-height: 91.2vh;
     display: flex;
     flex-direction: row;
-    flex: 1; /* Занимает всё пространство app-container */
-    width: 100%; /* Явно указываем ширину */
+    overflow: hidden;
 }
 
 .room-container {
     display: flex;
     flex-direction: column;
     min-width: 300px;
+    width: auto;
+    flex: 0 0 auto;
 }
 
 .settings {
-    background-color: #009dbd; /* ! */
+    background-color: #009dbd;
     min-height: 40px;
+    flex: 0 0 auto; /* Фиксированная высота */
     display: flex;
     flex-direction: row;
     justify-content: space-around;
@@ -22,10 +26,11 @@
 }
 
 .room-selector {
-    background-color: #a268d1; /* ! */
-    height: 100%;
+    flex: 1;
+    background-color: #a268d1;
     display: flex;
     flex-direction: row;
     gap: 5px;
     padding: 10px 0;
+    overflow: hidden;
 }

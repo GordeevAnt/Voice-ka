@@ -5,7 +5,13 @@
     display: flex;
     flex-direction: row;
     justify-content: center;
-    gap: 40px /* ! */
+    gap: 40px; /* ! */
+    position: fixed; /* Меняем на fixed */
+    bottom: 0;       /* Прижимаем к низу */
+    left: 0;         /* Растягиваем на всю ширину */
+    right: 0;        /* Растягиваем на всю ширину */
+    width: 100%;     /* Полная ширина */
+    z-index: 1000;   /* Поверх других элементов */
 }
 
 .chanel-list-changer {
