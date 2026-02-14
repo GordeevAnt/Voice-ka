@@ -13,7 +13,7 @@
     "windows": [
       {
         "decorations": false,
-        "minWidth": 700,
+        "minWidth": 750,
         "minHeight": 400,
         "maxWidth": 1920,
         "maxHeight": 1080,

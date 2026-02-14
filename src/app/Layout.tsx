@@ -17,9 +17,9 @@ export default function Layout() {
 
         <Outlet />
 
-      </div>
+        <Chanels_List />
 
-      <Chanels_List />
+      </div>
     </>
   )
 }

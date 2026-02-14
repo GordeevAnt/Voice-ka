@@ -1,17 +1,12 @@
 .chanels-container {
-    background-color: #09bd00; /* ! */
     height: 60px;
-    align-items: center;
     display: flex;
     flex-direction: row;
     justify-content: center;
-    gap: 40px; /* ! */
-    position: fixed; /* Меняем на fixed */
-    bottom: 0;       /* Прижимаем к низу */
-    left: 0;         /* Растягиваем на всю ширину */
-    right: 0;        /* Растягиваем на всю ширину */
-    width: 100%;     /* Полная ширина */
-    z-index: 1000;   /* Поверх других элементов */
+    align-items: center;
+    gap: 20px;
+    z-index: 100;   
+    background-color: #09bd00; /* ! */
 }
 
 .chanel-list-changer {

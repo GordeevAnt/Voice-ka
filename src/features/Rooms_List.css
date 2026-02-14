@@ -6,7 +6,6 @@
 }
 
 .rooms-list-block::-webkit-scrollbar {
-    margin-left: 20px;
     width: 5px;
 }
 
@@ -21,7 +20,6 @@
 }
 
 .rooms-list {
-    margin-right: 5px;
     display: flex;
     flex-direction: column;
     align-items: center;

@@ -1,8 +1,5 @@
 .titlebar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
+  position: relative;
   height: 32px;
   display: flex;
   justify-content: space-between;
@@ -14,7 +11,6 @@
   background: rgba(35, 86, 93, 0.7);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* rgba(35, 86, 93, 0.7);
@@ -94,7 +90,7 @@ color: #ffffff; */
   display: flex;
   align-items: center;
   justify-content: center;
-  -webkit-app-region: no-drag;  /* Отключаем перетаскивание для кнопок */
+  -webkit-app-region: no-drag;
   width: 40px;
   height: 32px;
   border: none;
