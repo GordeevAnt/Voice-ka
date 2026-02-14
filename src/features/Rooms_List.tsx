@@ -1,4 +1,4 @@
-import Room_Button from "../shared/Room_Button"
+import { Room_Button } from "../shared/Room_Button"
 
 import "./Rooms_List.css"
 
@@ -6,7 +6,7 @@ import "./Rooms_List.css"
 // Список добавленных каналов
 //
 
-export default function Rooms_List() {
+export function Rooms_List() {
     return <div className="rooms-list-block">
         <div className="rooms-list">
             <Room_Button />

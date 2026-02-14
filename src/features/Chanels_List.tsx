@@ -8,7 +8,7 @@ import "./Chanels_List.css"
 // Виджет вывода списка комнат канала
 //
 
-export default function Chanels_List() {
+export function Chanels_List() {
     const [sub, setSub] = useState(1);
     const [fav, setFav] = useState(0);
 

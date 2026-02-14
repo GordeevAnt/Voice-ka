@@ -6,7 +6,7 @@ import "./Messages_List.css"
 // Виджет отображения сообщений
 //
 
-export default function Messages_List() {
+export function Messages_List() {
     return <div className="messages-list-block"> 
         <div className="messages-list">
             <Message />

@@ -6,7 +6,7 @@ import "./Header.css"
 // Хедер (шапка окна)
 //
 
-export default function Header() {
+export function Header() {
 
     const appWindow = getCurrentWindow();
 

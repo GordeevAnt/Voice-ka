@@ -4,7 +4,7 @@ import "./Message_Input.css"
 // Виджет ввода сообщений
 //
 
-export default function Message_Input() {
+export function Message_Input() {
     return <div className="message-input-container">
         
         <div className="message-input-block">
