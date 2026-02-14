@@ -1,9 +1,9 @@
 //
-// Кнопка для настроек комнаты
+// Контейнер настроек комнаты
 //
 
 export function Room_Settings() {
-    return <button className="room-settings">
+    return <div className="room-settings-container">
         Комната
-    </button>
+    </div>
 }

@@ -1,9 +1,9 @@
 //
-// Кнопка для настроек пользователя
+// Контейнер настроек пользователя
 //
 
 export function Personal_Settings() {
-    return <button className="personal-settings">
+    return <div className="personal-settings-container">
         Пользователь
-    </button>
+    </div>
 }

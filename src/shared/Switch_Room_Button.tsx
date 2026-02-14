@@ -1,11 +1,11 @@
-import "./Room_Button.css"
+import "./Switch_Room_Button.css"
 
 //
 // Кнопка переключения комнаты
 //
 
-export function Room_Button() {
-    return <button className="room-btn">
+export function Switch_Room_Button() {
+    return <button className="switch-room-btn">
         <img src="../public/minimize.svg"/>
         <p>Название</p>
     </button>

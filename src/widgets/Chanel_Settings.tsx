@@ -1,9 +1,9 @@
 //
-// Кнопка для настроек канала
+// Контейнер настроек канала
 //
 
 export function Chanel_Settings() {
-    return <button className="chanel-settings">
+    return <div className="chanel-settings-container">
         Канал
-    </button>
+    </div>
 }

@@ -1,9 +1,9 @@
 import { Messenger_Field } from "../widgets/Messenger_Field"
-import { Chanel_Settings } from "../widgets/Chanel_Settings"
-import { Room_Settings } from "../widgets/Room_Settings"
-import { Personal_Settings } from "../widgets/Personal_Settings"
-import { Rooms_List } from "../features/Rooms_List"
+import Info_Chanel_Button from "../shared/Info_Chanel_Button"
+import Info_Room_Button from "../shared/Info_Room_Button"
+import Info_Personal_Account_Button from "../shared/Info_Personal_Account_Button"
 import { Rooms_Online_List } from "../widgets/Rooms_Online_List"
+import { Rooms_List } from "../features/Rooms_List"
 
 import "./Main_Page.css"
 
@@ -14,15 +14,14 @@ import "./Main_Page.css"
 export function Main_Page() {
     return (
         <div className="main-container">
-
-            <Messenger_Field />
             
+            <Messenger_Field />
             <div className="room-container">
                 
                 <div className="settings">
-                    <Chanel_Settings />
-                    <Room_Settings />
-                    <Personal_Settings />
+                    <Info_Chanel_Button />
+                    <Info_Room_Button />
+                    <Info_Personal_Account_Button />
                 </div>
                 
                 <div className="room-selector">

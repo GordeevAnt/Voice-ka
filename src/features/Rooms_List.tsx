@@ -1,4 +1,4 @@
-import { Room_Button } from "../shared/Room_Button"
+import { Switch_Room_Button } from "../shared/Switch_Room_Button"
 
 import "./Rooms_List.css"
 
@@ -9,30 +9,22 @@ import "./Rooms_List.css"
 export function Rooms_List() {
     return <div className="rooms-list-block">
         <div className="rooms-list">
-            <Room_Button />
-            <Room_Button />
-            <Room_Button />
-            <Room_Button />
-            <Room_Button />
-            <Room_Button />
-            <Room_Button />
-            <Room_Button />
-            <Room_Button />
-            <Room_Button />
-            <Room_Button />
-            <Room_Button />
-            <Room_Button />
-            <Room_Button />
-            <Room_Button />
-            <Room_Button />
-            <Room_Button />
-            <Room_Button />
-            <Room_Button />
-            <Room_Button />
-            <Room_Button />
-            <Room_Button />
-            <Room_Button />
-            <Room_Button />
+            <Switch_Room_Button />
+            <Switch_Room_Button />
+            <Switch_Room_Button />
+            <Switch_Room_Button />
+            <Switch_Room_Button />
+            <Switch_Room_Button />
+            <Switch_Room_Button />
+            <Switch_Room_Button />
+            <Switch_Room_Button />
+            <Switch_Room_Button />
+            <Switch_Room_Button />
+            <Switch_Room_Button />
+            <Switch_Room_Button />
+            <Switch_Room_Button />
+            <Switch_Room_Button />
+            <Switch_Room_Button />
         </div>
     </div>
 }

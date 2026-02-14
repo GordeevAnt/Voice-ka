@@ -1,6 +1,6 @@
 import { useState } from "react";
-import Chanel_Button from "../shared/Chanel_Button"
-import Add_Chanel from "../shared/Add_Chanel"
+import { Switch_Chanel_Button } from "../shared/Switch_Chanel_Button"
+import { Add_Chanel } from "../shared/Add_Chanel"
 
 import "./Chanels_List.css"
 
@@ -53,7 +53,7 @@ export function Chanels_List() {
             <div className="chanel-list-block">
                 <div className="chanel-list">
                     {subList.map(() => (
-                        <Chanel_Button />
+                        <Switch_Chanel_Button />
                     ))}
                 </div>
             </div>
