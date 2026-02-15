@@ -18,6 +18,10 @@ export function Header() {
                 <img src="./public/voice-ka.svg" />
             </div>
             
+            <div className="titlebar-title-name">
+                <h4>Voice-ka</h4>
+            </div>
+
             <div className="titlebar-controls">
                 
                 <button className="titlebar-btn" id="titlebar-minimize" onClick={() => appWindow.minimize()}>–</button>

@@ -80,6 +80,13 @@ color: #ffffff; */
   color: #ffffff;
 }
 
+/* Название приложения */
+.titlebar-title-name {
+  height: 32px;
+  display: flex;
+  align-items: center;
+}
+
 /* Кнопки управления окном */
 .titlebar-controls {
   display: flex;
