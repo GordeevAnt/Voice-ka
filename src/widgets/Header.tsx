@@ -15,7 +15,7 @@ export function Header() {
         <div className="titlebar" data-tauri-drag-region>
             
             <div className="titlebar-title">
-                <img src="./public/voice-ka.svg" />
+                <img src="/voice-ka.svg" />
             </div>
             
             <div className="titlebar-title-name">
@@ -27,11 +27,11 @@ export function Header() {
                 <button className="titlebar-btn" id="titlebar-minimize" onClick={() => appWindow.minimize()}>–</button>
                 
                 <button className="titlebar-btn" id="titlebar-switch-window-size" onClick={() => appWindow.toggleMaximize()}>
-                    <img src="./public/maximize.svg" />
+                    <img src="/maximize.svg" />
                 </button>
                 
                 <button className="titlebar-btn close" id="titlebar-close" onClick={() => appWindow.close()}>
-                    <img src="./public/close.svg" />
+                    <img src="/close.svg" />
                 </button>
             
             </div>

@@ -1,6 +1,5 @@
 import { Outlet } from "react-router-dom";
 import { Header } from "../widgets/Header";
-import { Chanels_List } from "../features/Chanels_List";
 
 import "./App.css"
 
@@ -16,8 +15,6 @@ export default function Layout() {
       <div className="app-container">
 
         <Outlet />
-
-        <Chanels_List />
 
       </div>
     </>

@@ -1,3 +1,9 @@
+.main-page-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
 .main-container {
     height: 100vh;
     max-height: 91.2vh;

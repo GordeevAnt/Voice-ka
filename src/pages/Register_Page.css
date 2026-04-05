@@ -1,0 +1,38 @@
+.register-page-container {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-color: rgb(213, 214, 215);
+}
+
+.back-btn-container {
+    width: 50%;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.reg-greet {
+    font-size: 6vh;
+}
+
+.register-form {
+    padding: 0 0 5vh 0;
+    width: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1vh;
+}
+
+.login, .first-password, .second-password {
+    width: 100%;
+    height: 6vh;
+}
+
+.reg-form-btn-submit {
+    height: 7vh;
+    width: 50%;
+    margin-top: 3vh;
+}

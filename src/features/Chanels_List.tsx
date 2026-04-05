@@ -52,8 +52,8 @@ export function Chanels_List() {
             
             <div className="chanel-list-block">
                 <div className="chanel-list">
-                    {subList.map(() => (
-                        <Switch_Chanel_Button />
+                    {subList.map((item) => (
+                        <Switch_Chanel_Button key={item.toString()} />
                     ))}
                 </div>
             </div>

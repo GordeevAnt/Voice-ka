@@ -6,6 +6,8 @@ import { Rooms_Online_List } from "../widgets/Rooms_Online_List"
 import { Rooms_List } from "../features/Rooms_List"
 
 import "./Main_Page.css"
+import { Chanels_List } from "../features/Chanels_List"
+import { Logout } from "../entities/Logout"
 
 //
 // Главная страница
@@ -13,23 +15,31 @@ import "./Main_Page.css"
 
 export function Main_Page() {
     return (
-        <div className="main-container">
+        <div className="main-page-container">
             
-            <Messenger_Field />
-            <div className="room-container">
+            <div className="main-container">
+
+                <Messenger_Field />
+
+                <div className="room-container">
+                    
+                    <div className="settings">
+                        <Info_Chanel_Button />
+                        <Info_Room_Button />
+                        <Info_Personal_Account_Button />
+                        <Logout />
+                    </div>
+                    
+                    <div className="room-selector">
+                        <Rooms_Online_List />
+                        <Rooms_List />
+                    </div>
                 
-                <div className="settings">
-                    <Info_Chanel_Button />
-                    <Info_Room_Button />
-                    <Info_Personal_Account_Button />
                 </div>
-                
-                <div className="room-selector">
-                    <Rooms_Online_List />
-                    <Rooms_List />
-                </div>
-            
+
             </div>
+
+            <Chanels_List />
         
         </div>
     )
