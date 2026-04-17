@@ -4,6 +4,7 @@ use argon2::{
     Argon2, PasswordHasher
 };
 use chrono::Utc;
+use serde_json::json;
 
 #[tauri::command]
 pub async fn register(login: String, email: String, password: String, confirm_password: String) -> Result<(bool, i32), String> {
@@ -63,10 +64,10 @@ pub async fn register(login: String, email: String, password: String, confirm_pa
         .await
         .map_err(|e| format!("Ошибка начала транзакции: {}", e))?;
     
-    // Создаем пользователя
+    // Создаем пользователя (статус 'offline' до первого входа)
     let user_id: i32 = sqlx::query_scalar(
         "INSERT INTO users (username, email, password_hash, status, created_at, updated_at) 
-        VALUES ($1, $2, $3, 'online', $4, $4)
+        VALUES ($1, $2, $3, 'offline', $4, $4)
         RETURNING id"
     )
     .bind(&login)
@@ -127,7 +128,7 @@ pub async fn register(login: String, email: String, password: String, confirm_pa
     .await
     .map_err(|e| format!("Ошибка назначения роли: {}", e))?;
     
-    // Создаем текстовую комнату (без указания id, пусть генерируется автоматически)
+    // Создаем текстовую комнату
     sqlx::query(
         "INSERT INTO rooms (name, type, guild_id, position, created_at, updated_at)
         VALUES ('general', 'text', $1, 0, $2, $2)"
@@ -148,6 +149,52 @@ pub async fn register(login: String, email: String, password: String, confirm_pa
     .execute(&mut *transaction)
     .await
     .map_err(|e| format!("Ошибка создания голосовой комнаты: {}", e))?;
+    
+    // Создаем дефолтные звуковые уведомления
+    for event_type in &["message", "mention", "join", "leave", "call"] {
+        sqlx::query(
+            "INSERT INTO notification_sounds (user_id, event_type, is_enabled, volume, created_at, updated_at)
+            VALUES ($1, $2, true, 1.0, $3, $3)"
+        )
+        .bind(user_id)
+        .bind(event_type)
+        .bind(Utc::now())
+        .execute(&mut *transaction)
+        .await
+        .map_err(|e| format!("Ошибка создания уведомления для {}: {}", event_type, e))?;
+    }
+    
+    // Создаем дефолтный голосовой пресет
+    let default_effects = json!({
+        "noise_suppression": true,
+        "echo_cancel": true,
+        "auto_gain": true
+    });
+    
+    sqlx::query(
+        "INSERT INTO voice_presets (user_id, name, effects, is_global, guild_id, created_at, updated_at)
+        VALUES ($1, 'Чистый голос', $2::jsonb, false, NULL, $3, $3)"
+    )
+    .bind(user_id)
+    .bind(default_effects.to_string())
+    .bind(Utc::now())
+    .execute(&mut *transaction)
+    .await
+    .map_err(|e| format!("Ошибка создания голосового пресета: {}", e))?;
+    
+    // Добавляем запись в аудит-лог
+    sqlx::query(
+        "INSERT INTO audit_logs (guild_id, user_id, action_type, target_id, changes, created_at)
+        VALUES ($1, $2, 'USER_REGISTER', $3, $4::jsonb, $5)"
+    )
+    .bind(guild_id)
+    .bind(user_id)
+    .bind(user_id)
+    .bind(json!({"username": login, "email": email}).to_string())
+    .bind(Utc::now())
+    .execute(&mut *transaction)
+    .await
+    .map_err(|e| format!("Ошибка создания аудит-лога: {}", e))?;
     
     // Фиксируем транзакцию
     transaction
