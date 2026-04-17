@@ -1,13 +1,64 @@
-import "./Message.css"
+import { memo } from "react";
+import "./Message.css";
 
-//
-// Отображает конкретное сообщение
-//
+export type MessageProps = {
+  id: number;
+  author: string;
+  text: string;
+  timestamp: string;
+  isCurrentUser?: boolean;
+  onDelete?: (id: number) => void;
+  onEdit?: (message: any) => void;
+};
 
-export default function Message() {
-    return <div className="message">
-        <div className="message-avatar-block">Аватар</div>{/* <Avatar /> */}
-        <div className="message-text-block">Текст</div>{/* <Text /> */}
-        <div className="message-time-block">Время</div>{/* <Time /> */}
-    </div>
-}
+// Функция сравнения для глубокого сравнения
+const areEqual = (prevProps: MessageProps, nextProps: MessageProps) => {
+  return (
+    prevProps.id === nextProps.id &&
+    prevProps.author === nextProps.author &&
+    prevProps.text === nextProps.text &&
+    prevProps.timestamp === nextProps.timestamp &&
+    prevProps.isCurrentUser === nextProps.isCurrentUser
+  );
+};
+
+export const Message = memo(({ 
+    id, 
+    author, 
+    text, 
+    timestamp, 
+    isCurrentUser,
+    onDelete,
+    onEdit 
+    }: MessageProps) => {
+    
+    const handleDelete = () => {
+        if (onDelete && window.confirm("Удалить сообщение?")) {
+        onDelete(id);
+        }
+    };
+
+    return (
+        <div className={`message ${isCurrentUser ? "message-current-user" : ""}`}>
+        <div className="message-avatar-block">
+            {author[0]?.toUpperCase() || "?"}
+        </div>
+        <div className="message-content">
+            <div className="message-header">
+            <span className="message-author">{author}</span>
+            <span className="message-time">{timestamp}</span>
+            </div>
+            <div className="message-text-block">{text}</div>
+        </div>
+        {isCurrentUser && (
+            <div className="message-actions">
+            <button onClick={handleDelete} className="message-delete-btn">
+                🗑️
+            </button>
+            </div>
+        )}
+        </div>
+    );
+}, areEqual);
+
+Message.displayName = "Message";
