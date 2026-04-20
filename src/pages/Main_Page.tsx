@@ -16,15 +16,38 @@ import { useState } from "react"
 //
 
 export function Main_Page() {
-    const [currentGuildId, setCurrentGuildId] = useState<number>(-1);
-    const [currentRoomId, setCurrentRoomId] = useState<number | undefined>();
+    const [currentGuildId, setCurrentGuildId] = useState<number | null>(() => {
+        // Загружаем сохраненный канал из localStorage
+        const savedGuildId = localStorage.getItem('current_guild_id');
+        return savedGuildId ? parseInt(savedGuildId) : null;
+    });
+    const [currentRoomId, setCurrentRoomId] = useState<number | undefined>(() => {
+        const savedRoomId = localStorage.getItem('current_room_id');
+        return savedRoomId ? parseInt(savedRoomId) : undefined;
+    });
+
+    const handleGuildSelect = (guildId: number) => {
+        setCurrentGuildId(guildId);
+        localStorage.setItem('current_guild_id', guildId.toString());
+        // Сбрасываем выбранную комнату при смене канала
+        setCurrentRoomId(undefined);
+        localStorage.removeItem('current_room_id');
+    };
+
+    // const handleRoomSelect = (roomId: number) => {
+    //     setCurrentRoomId(roomId);
+    //     localStorage.setItem('current_room_id', roomId.toString());
+    // };
 
     // Если нет выбранного канала (guild) или нет пользователя
     if (currentGuildId === -1) {
         return (
             <div className="main-page-container">
                 <div className="main-container"></div>
-                <Chanels_List />
+                <Chanels_List 
+                    currentGuildId={currentGuildId}
+                    onGuildSelect={handleGuildSelect}
+                />
             </div>
         )
     }
@@ -48,7 +71,7 @@ export function Main_Page() {
                     <div className="room-selector">
                         <Rooms_Online_List />
                         <Rooms_List 
-                            guildId={currentGuildId}
+                            guildId={currentGuildId as number}
                             currentRoomId={currentRoomId}
                             onRoomSelect={setCurrentRoomId}
                         />
@@ -58,7 +81,10 @@ export function Main_Page() {
 
             </div>
 
-            <Chanels_List />
+            <Chanels_List 
+                currentGuildId={currentGuildId as number}
+                onGuildSelect={handleGuildSelect}
+            />
         
         </div>
     )

@@ -1,11 +1,30 @@
 import "./Switch_Chanel_Button.css"
 
-//
-// Кнопка перехода на канал
-//
+interface SwitchChanelButtonProps {
+    guildId: number;
+    icon: string;
+    isActive: boolean;
+    onSelect: (guildId: number) => void;
+}
 
-export function Switch_Chanel_Button({guildId, icon}: {guildId: number, icon: string}) {
-    return <button id={`guild ${ guildId.toString()}`} className="switch-chanel-btn">
-        <img src={icon} />
-    </button>
+export function Switch_Chanel_Button({ 
+    guildId, 
+    icon, 
+    isActive, 
+    onSelect 
+}: SwitchChanelButtonProps) {
+    const handleClick = () => {
+        onSelect(guildId);
+        console.log(guildId.toString())
+    };
+
+    return (
+        <button 
+            id={`guild-${guildId}`} 
+            className={`switch-chanel-btn ${isActive ? 'active' : ''}`}
+            onClick={handleClick}
+        >
+            <img src={icon} alt={`Channel ${guildId}`} />
+        </button>
+    )
 }

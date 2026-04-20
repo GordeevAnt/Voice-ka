@@ -3,4 +3,32 @@
     min-width: 45px;
     border-radius: 100%;
     align-items: center;
+    cursor: pointer;
+}
+
+.switch-chanel-btn:hover {
+    background: #5865f2;
+    border-radius: 16px;
+}
+
+.switch-chanel-btn.active {
+    background: #5865f2;
+    border-radius: 16px;
+}
+
+.switch-chanel-btn.active::before {
+    content: '';
+    position: absolute;
+    left: -12px;
+    width: 4px;
+    height: 20px;
+    background: white;
+    border-radius: 4px;
+}
+
+.switch-chanel-btn img {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    object-fit: cover;
 }

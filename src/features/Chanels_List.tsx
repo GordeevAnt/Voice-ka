@@ -13,8 +13,13 @@ interface Guild {
     description: string | null;
 }
 
+interface ChanelsListProps {
+    currentGuildId?: number;
+    onGuildSelect: (guildId: number) => void;
+}
+
 // Виджет вывода списка комнат канала
-export function Chanels_List() {
+export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps) {
     const [guilds, setGuilds] = useState<Guild[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -63,6 +68,10 @@ export function Chanels_List() {
         fetchGuilds();
     };
 
+    const handleGuildSelect = (guildId: number) => {
+        onGuildSelect(guildId);
+    };
+
     if (loading) {
         return (
             <footer className="chanels-container">
@@ -80,6 +89,8 @@ export function Chanels_List() {
                             key={guild.id}
                             guildId={guild.id}
                             icon={getIcon(guild.icon)}
+                            isActive={currentGuildId === guild.id}
+                            onSelect={handleGuildSelect}
                         />
                     ))}
                 </div>
