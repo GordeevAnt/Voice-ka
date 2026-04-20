@@ -1,66 +1,90 @@
-import { useState } from "react";
-import { Switch_Chanel_Button } from "../shared/Switch_Chanel_Button"
-import { Add_Chanel } from "../shared/Add_Chanel"
+import { useState, useEffect } from "react";
+import { Switch_Chanel_Button } from "../shared/Switch_Chanel_Button";
+import { Add_Chanel } from "../shared/Add_Chanel";
+import { invoke } from "@tauri-apps/api/core";
+import "./Chanels_List.css";
 
-import "./Chanels_List.css"
+// Интерфейс канала
+interface Guild {
+    id: number;
+    name: string;
+    icon: string | null;
+    owner_id: number;
+    description: string | null;
+}
 
-//
 // Виджет вывода списка комнат канала
-//
-
 export function Chanels_List() {
-    const [sub, setSub] = useState(1);
-    const [fav, setFav] = useState(0);
+    const [guilds, setGuilds] = useState<Guild[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    const [subList, setSubList] = useState([1, 2, 3, 4, 5, 6, 7]);
-    const [favList, setFavList] = useState([1, 2, 3, 4]);
-    
-    const handleGroupSwitch = () => {
-        if(sub == 1) {
-            setSub(0)
-            setFav(1)
+    const getIcon = (icon: string | null) => {
+        if (!icon) {
+            return "/voice-ka.svg";
         }
-        else {
-            setFav(0)
-            setSub(1)
+        
+        if (icon.startsWith('/')) {
+            return icon;
         }
-        console.log(sub);
-        console.log(fav);
-    }
+        
+        return `/icons/${icon}`;
+    };
+
+    // Загрузка каналов пользователя
+    useEffect(() => {
+        const fetchGuilds = async () => {
+            try {
+                setLoading(true);
+                const userId = localStorage.getItem('user_id');
+                
+                if (!userId) {
+                    console.error("Пользователь не авторизован");
+                    setLoading(false);
+                    return;
+                }
+                
+                const guildsData = await invoke<Guild[]>("get_user_guilds", { 
+                    userId: parseInt(userId) 
+                });
+                
+                setGuilds(guildsData);
+            } catch (err) {
+                console.error("Ошибка загрузки каналов:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        
+        fetchGuilds();
+    }, []);
 
     const handleAddChanel = () => {
-        if(sub == 1) {
-            setSubList([...subList, 1]);
-            console.log(1);
-            console.log(subList);
-        }
-        else {
-            setFavList([...favList, 1]);
-            console.log(1);
-            console.log(favList);
-        }
+        console.log("Добавление канала");
+    };
+
+    if (loading) {
+        return (
+            <footer className="chanels-container">
+                <div className="loading">Загрузка каналов...</div>
+            </footer>
+        );
     }
 
     return (
-    <>
         <footer className="chanels-container">
-
-            <div className="chanel-list-changer">
-                <button className="sub-chanel-btn" onClick={handleGroupSwitch}>Подписки</button>
-                <button className="fav-chanel-btn" onClick={handleGroupSwitch}>Избранное</button>
-            </div>
-            
             <div className="chanel-list-block">
                 <div className="chanel-list">
-                    {subList.map((item) => (
-                        <Switch_Chanel_Button key={item.toString()} />
+                    {guilds.map((guild) => (
+                        <Switch_Chanel_Button
+                            key={guild.id}
+                            guildId={guild.id}
+                            icon={getIcon(guild.icon)}
+                        />
                     ))}
                 </div>
             </div>
             
-            <Add_Chanel onClick={handleAddChanel}/>
-            
+            <Add_Chanel onClick={handleAddChanel} />
         </footer>
-    </>
-    )
+    );
 }

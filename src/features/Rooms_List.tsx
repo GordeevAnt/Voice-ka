@@ -17,12 +17,11 @@ interface RoomData {
 
 interface RoomsListProps {
     guildId: number; // ID текущей гильдии
-    userId: number;
     currentRoomId?: number;
     onRoomSelect?: (roomId: number) => void;
 }
 
-export const Rooms_List = memo(({ guildId, userId, currentRoomId, onRoomSelect }: RoomsListProps) => {
+export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsListProps) => {
     const [rooms, setRooms] = useState<RoomData[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -67,7 +66,6 @@ export const Rooms_List = memo(({ guildId, userId, currentRoomId, onRoomSelect }
             topic: newRoomTopic.trim() || null,
             bitrate: newRoomType === 'voice' ? 64000 : null,
             user_limit: newRoomType === 'voice' ? 0 : null,
-            creator_id: userId,
             }
         });
         
@@ -82,13 +80,13 @@ export const Rooms_List = memo(({ guildId, userId, currentRoomId, onRoomSelect }
         } catch (err) {
         alert(err instanceof Error ? err.message : "Ошибка создания комнаты");
         }
-    }, [newRoomName, newRoomType, newRoomTopic, guildId, userId, onRoomSelect]);
+    }, [newRoomName, newRoomType, newRoomTopic, guildId, onRoomSelect]);
 
     const handleDeleteRoom = useCallback(async (roomId: number) => {
         if (!confirm("Вы уверены, что хотите удалить эту комнату?")) return;
         
         try {
-        await invoke("delete_room", { roomId, userId });
+        await invoke("delete_room", { roomId });
         setRooms(prev => prev.filter(room => room.id !== roomId));
         
         if (currentRoomId === roomId && onRoomSelect) {
@@ -97,7 +95,7 @@ export const Rooms_List = memo(({ guildId, userId, currentRoomId, onRoomSelect }
         } catch (err) {
         alert(err instanceof Error ? err.message : "Ошибка удаления комнаты");
         }
-    }, [userId, currentRoomId, rooms, onRoomSelect]);
+    }, [currentRoomId, rooms, onRoomSelect]);
 
     if (loading && rooms.length === 0) {
         return (

@@ -1,6 +1,6 @@
 // src/logic/mod.rs
-pub mod message;
-pub use message::get_room_messages;
+pub mod guild;
+pub use guild::get_user_guilds;
 
 pub mod room;
 pub use room::{
@@ -14,3 +14,9 @@ pub use room::{
     RoomData,
     CreateRoomData,
 };
+
+pub mod message;
+pub use message::get_room_messages;
+
+// pub mod user;
+// pub use user::get_current_user;
