@@ -1,6 +1,10 @@
 // src/logic/mod.rs
 pub mod guild;
-pub use guild::get_user_guilds;
+pub use guild::{
+    get_user_guilds,
+    find_guild_by_id,
+    join_guild_by_id,
+};
 
 pub mod room;
 pub use room::{

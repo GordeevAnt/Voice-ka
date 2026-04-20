@@ -228,7 +228,8 @@ async fn seed_database(pool: &PgPool) -> Result<(), Box<dyn std::error::Error>> 
         INSERT INTO guilds (id, name, icon, owner_id, description, created_at, updated_at)
         VALUES 
             (1, 'Voice-ka', NULL, 1, 'Начальный сервер', '2024-01-20 12:00:00+00', '2025-04-10 15:00:00+00'),
-            (2, 'Music Hub', NULL, 2, 'Музыкальный сервер', '2024-02-25 18:30:00+00', '2025-04-12 20:00:00+00')
+            (2, 'Music Hub', NULL, 2, 'Музыкальный сервер', '2024-02-25 18:30:00+00', '2025-04-12 20:00:00+00'),
+            (3, 'Ale', NULL, 3, 'ALE Barmale', '2024-02-25 18:30:00+00', '2025-04-12 20:00:00+00')
         "#
     )
     .execute(pool)

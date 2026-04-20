@@ -18,8 +18,10 @@ use db::init_database;
 pub mod logic;
 use logic::{
     get_room_messages,
-    get_guild_rooms,
     get_user_guilds,
+    get_guild_rooms,
+    find_guild_by_id,
+    join_guild_by_id,
     get_user_rooms,
     get_room_by_id,
     create_room,
@@ -48,8 +50,10 @@ pub fn run() {
             logout,
             register,
             get_room_messages,
-            get_guild_rooms,
             get_user_guilds,
+            get_guild_rooms,
+            find_guild_by_id,
+            join_guild_by_id,
             get_user_rooms,
             get_room_by_id,
             create_room,

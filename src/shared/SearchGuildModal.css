@@ -1,0 +1,223 @@
+/* src/components/shared/SearchGuildModal.css */
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    animation: fadeIn 0.2s ease;
+}
+
+.modal-content {
+    background: #2c2f33;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
+    animation: slideIn 0.3s ease;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid #23272a;
+    background: #2c2f33;
+    border-radius: 8px 8px 0 0;
+}
+
+.modal-header h2 {
+    margin: 0;
+    color: #ffffff;
+    font-size: 20px;
+}
+
+.close-button {
+    background: none;
+    border: none;
+    color: #b9bbbe;
+    font-size: 28px;
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.close-button:hover {
+    color: #ffffff;
+    background: #23272a;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.search-input-group {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.search-input-group input {
+    flex: 1;
+    padding: 10px 12px;
+    background: #23272a;
+    border: 1px solid #4a4c52;
+    border-radius: 4px;
+    color: #ffffff;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.search-input-group input:focus {
+    outline: none;
+    border-color: #7289da;
+}
+
+.search-button {
+    padding: 10px 20px;
+    background: #7289da;
+    border: none;
+    border-radius: 4px;
+    color: white;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.search-button:hover:not(:disabled) {
+    background: #5b6eae;
+}
+
+.search-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.error-message {
+    background: #f04747;
+    color: white;
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+    font-size: 14px;
+}
+
+.guild-info {
+    background: #23272a;
+    border-radius: 8px;
+    padding: 16px;
+    margin-top: 20px;
+}
+
+.guild-info h3 {
+    color: #ffffff;
+    margin: 0 0 12px 0;
+    font-size: 16px;
+}
+
+.guild-details {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.guild-icon {
+    flex-shrink: 0;
+}
+
+.guild-icon img {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.default-icon {
+    width: 64px;
+    height: 64px;
+    background: #5865f2;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+}
+
+.guild-info-text {
+    flex: 1;
+}
+
+.guild-name {
+    color: #ffffff;
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.guild-id {
+    color: #b9bbbe;
+    font-size: 12px;
+    margin-bottom: 8px;
+}
+
+.guild-description {
+    color: #dcddde;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.join-button {
+    width: 100%;
+    padding: 10px;
+    background: #43b581;
+    border: none;
+    border-radius: 4px;
+    color: white;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.join-button:hover:not(:disabled) {
+    background: #3ca374;
+}
+
+.join-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
