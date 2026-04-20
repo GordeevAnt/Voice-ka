@@ -14,6 +14,7 @@
 .switch-chanel-btn.active {
     background: #5865f2;
     border-radius: 16px;
+    cursor: default;
 }
 
 .switch-chanel-btn.active::before {

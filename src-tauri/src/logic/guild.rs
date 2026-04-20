@@ -30,7 +30,7 @@ pub async fn get_user_guilds(user_id: i32) -> Result<Vec<Guild>, String> {
         FROM guilds g
         INNER JOIN guild_members gm ON g.id = gm.guild_id
         WHERE gm.user_id = $1
-        ORDER BY g.name ASC
+        ORDER BY g.name DESC
         "#,
         user_id
     )

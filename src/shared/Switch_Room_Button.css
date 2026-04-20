@@ -1,5 +1,81 @@
-.switch-room-btn {
-    width: 95%;
+.switch-room-wrapper {
     display: flex;
-    flex-direction: row;
+    align-items: center;
+    padding: 8px 12px;
+    margin: 2px 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    background-color: transparent;
+}
+
+.switch-room-wrapper:hover {
+    background-color: #4a4c52;
+}
+
+.switch-room-wrapper.active {
+    background-color: #4a4c52;
+}
+
+.switch-room-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.room-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+}
+
+.room-icon {
+    font-size: 18px;
+    font-weight: 600;
+    color: #b9bbbe;
+}
+
+.room-name {
+    margin: 0;
+    font-size: 14px;
+    color: #ffffff;
+    font-weight: 500;
+}
+
+.room-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.member-count {
+    font-size: 12px;
+    color: #b9bbbe;
+    background-color: #2c2f33;
+    padding: 2px 6px;
+    border-radius: 12px;
+}
+
+.delete-room-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: background-color 0.2s;
+    color: #b9bbbe;
+}
+
+.delete-room-btn:hover {
+    background-color: #f04747;
+    color: white;
+}
+
+/* Для поддержки фокуса с клавиатуры */
+.switch-room-wrapper:focus-visible {
+    outline: 2px solid #7289da;
+    outline-offset: 2px;
 }

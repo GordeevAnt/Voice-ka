@@ -23,6 +23,7 @@ export function Switch_Chanel_Button({
             id={`guild-${guildId}`} 
             className={`switch-chanel-btn ${isActive ? 'active' : ''}`}
             onClick={handleClick}
+            disabled={isActive}
         >
             <img src={icon} alt={`Channel ${guildId}`} />
         </button>
