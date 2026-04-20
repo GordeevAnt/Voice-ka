@@ -1,5 +1,28 @@
-/* src/components/shared/SearchGuildModal.css */
+.search-chanel-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #36393f;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    transition: all 0.2s;
+}
 
+.search-chanel-btn:hover {
+    background: #5865f2;
+    border-radius: 16px;
+}
+
+.search-chanel-btn img {
+    width: 24px;
+    height: 24px;
+}
+
+/* Modal styles */
 .modal-overlay {
     position: fixed;
     top: 0;
