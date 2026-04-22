@@ -1,34 +1,47 @@
 #!/bin/bash
 
-echo "🚀 Настройка окружения разработки Voice-ka"
+echo "🚀 Voice-ka - Setup Development Environment"
+echo "==========================================="
+echo ""
 
-# Запуск Docker контейнера с PostgreSQL
-echo "📦 Запуск PostgreSQL в Docker..."
-docker-compose up -d
+# Проверка Docker
+if ! command -v docker &> /dev/null; then
+    echo "❌ Docker not found! Please install Docker first."
+    echo "   https://docs.docker.com/get-docker/"
+    exit 1
+fi
 
-# Ожидание запуска
-echo "⏳ Ожидание запуска PostgreSQL..."
+# Запуск PostgreSQL
+echo "📦 Starting PostgreSQL..."
+cd "$(dirname "$0")"
+docker compose up -d
+
+# Ожидание готовности БД
+echo "⏳ Waiting for PostgreSQL..."
 sleep 5
 
-# Проверка подключения
-echo "🔌 Проверка подключения..."
-docker exec voice-ka-postgres pg_isready -U postgres
+# Проверка
+echo "🔌 Checking connection..."
+docker exec pp-gordeev-voice-ka-postgres pg_isready -U postgres
 
-# Создание .env файла если не существует
+# Создание .env в корне проекта
+cd ../..
 if [ ! -f .env ]; then
-    echo "📝 Создание .env файла..."
-    cat > .env << EOF
+    echo "📝 Creating .env file..."
+    cat > .env << 'EOF'
 DATABASE_URL=postgres://gbilly_sysadmin:BillyJinn228@localhost:5432/Voice-ka_Local
-ADMIN_DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres
 EOF
+    echo "✅ .env created"
 fi
 
 # Установка зависимостей
-echo "📦 Установка зависимостей..."
+echo "📦 Installing dependencies..."
 npm install
 
 # Запуск миграций
-echo "🔄 Запуск миграций..."
+echo "🔄 Running migrations..."
 cargo run --bin migrate
 
-echo "✅ Готово! Запустите npm run tauri dev"
+echo ""
+echo "✅ Setup complete!"
+echo "   Run: npm run tauri dev"
