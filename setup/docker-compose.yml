@@ -10,8 +10,13 @@ services:
       POSTGRES_DB: postgres
       PGUSER: postgres
       PGPASSWORD: postgres
+      POSTGRES_INITDB_ARGS: "--locale-provider=libc --locale=C"
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+      LC_MESSAGES: C.UTF-8
+      LC_CTYPE: C.UTF-8
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
       - ./docker/init.sql:/docker-entrypoint-initdb.d/01-init.sql

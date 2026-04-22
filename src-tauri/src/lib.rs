@@ -28,6 +28,7 @@ use logic::{
     update_room,
     delete_room,
     create_dm_room,
+    get_current_user,
 };
 
 // Запуск приложения с инициализацией БД
@@ -60,6 +61,7 @@ pub fn run() {
             update_room,
             delete_room,
             create_dm_room,
+            get_current_user,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

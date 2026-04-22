@@ -22,5 +22,5 @@ pub use room::{
 pub mod message;
 pub use message::get_room_messages;
 
-// pub mod user;
-// pub use user::get_current_user;
+pub mod user;
+pub use user::get_current_user;

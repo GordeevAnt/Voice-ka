@@ -4,7 +4,7 @@ use tauri::command;
 use chrono::{DateTime, Utc};
 use crate::db::get_db_pool;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
 pub struct MessageData {
     pub id: i64,
     pub room_id: i32,
@@ -22,14 +22,14 @@ pub struct MessageData {
 pub async fn get_room_messages(room_id: i32) -> Result<Vec<MessageData>, String> {
     let pool = get_db_pool();
     
-    let messages = sqlx::query!(
+    let messages = sqlx::query_as::<_, MessageData>(
         r#"
         SELECT 
             m.id,
             m.room_id,
             m.user_id,
             m.content,
-            m.attachments as "attachments: serde_json::Value",
+            COALESCE(m.attachments, '[]'::jsonb) as attachments,
             m.reply_to_id,
             m.edited_at,
             m.deleted_at,
@@ -39,26 +39,12 @@ pub async fn get_room_messages(room_id: i32) -> Result<Vec<MessageData>, String>
         JOIN users u ON m.user_id = u.id
         WHERE m.room_id = $1 AND m.deleted_at IS NULL
         ORDER BY m.created_at ASC
-        "#,
-        room_id
+        "#
     )
+    .bind(room_id)
     .fetch_all(pool)
     .await
-    .map_err(|e| format!("Ошибка загрузки сообщений: {}", e))?
-    .into_iter()
-    .map(|row| MessageData {
-        id: row.id,
-        room_id: row.room_id,
-        user_id: row.user_id,
-        content: row.content,
-        attachments: row.attachments.unwrap_or(serde_json::json!([])),
-        reply_to_id: row.reply_to_id,
-        edited_at: row.edited_at,
-        deleted_at: row.deleted_at,
-        created_at: row.created_at,
-        author_name: row.author_name,
-    })
-    .collect();
+    .map_err(|e| format!("Ошибка загрузки сообщений: {}", e))?;
     
     Ok(messages)
 }
