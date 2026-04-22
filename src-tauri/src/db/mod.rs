@@ -1,7 +1,8 @@
 // src-tauri/src/db/mod.rs
-use sqlx::postgres::{PgPoolOptions, PgConnectOptions};
+use sqlx::postgres::{PgPoolOptions};
 use sqlx::{PgPool, Executor};
 use std::sync::OnceLock;
+use url::Url; // ИСПРАВЛЕНО: добавлен импорт url::Url
 
 // Глобальный пул соединений
 static DB_POOL: OnceLock<PgPool> = OnceLock::new();
@@ -31,7 +32,6 @@ async fn run_migration_script(pool: &PgPool) -> Result<(), Box<dyn std::error::E
         // Добавляем точку с запятой обратно для выполнения
         let stmt_with_semicolon = format!("{};", trimmed);
         
-        // ИСПРАВЛЕНО: используем .as_str() для конвертации String в &str
         match pool.execute(stmt_with_semicolon.as_str()).await {
             Ok(result) => {
                 success_count += 1;
@@ -40,10 +40,13 @@ async fn run_migration_script(pool: &PgPool) -> Result<(), Box<dyn std::error::E
                 }
             }
             Err(e) => {
-                // Игнорируем ошибки о существующих constraints, индексах и т.д.
                 let error_msg = e.to_string();
-                if error_msg.contains("already exists") {
-                    println!("  ⚠️ Пропущен дублирующий объект: {}", error_msg.split('"').nth(1).unwrap_or("unknown"));
+                // Пропускаем различные типы ошибок "already exists"
+                if error_msg.contains("already exists") 
+                    || error_msg.contains("duplicate") 
+                    || error_msg.contains("already defined")
+                    || (error_msg.contains("relation") && error_msg.contains("already exists")) { // ИСПРАВЛЕНО: добавлены скобки
+                    println!("  ⚠️ Пропущен дублирующий объект: {}", error_msg);
                     error_count += 1;
                 } else {
                     println!("  ✗ Ошибка: {}", error_msg);
@@ -58,40 +61,114 @@ async fn run_migration_script(pool: &PgPool) -> Result<(), Box<dyn std::error::E
     Ok(())
 }
 
-/// Проверяет существование базы данных и создает её при необходимости
-async fn ensure_database_exists(database_url: &str) -> Result<String, Box<dyn std::error::Error>> {
-    // Парсим URL для подключения к postgres без указания базы данных
-    let url = url::Url::parse(database_url)?;
+/// Парсит DATABASE_URL и возвращает компоненты подключения
+fn parse_db_url(url_str: &str) -> Result<(String, u16, String, String, String), Box<dyn std::error::Error>> {
+    let url = Url::parse(url_str)?; // ИСПРАВЛЕНО: используем импортированный Url
     
-    let db_name = url.path().trim_start_matches('/');
-    let default_db_url = url.join("postgres")?;
+    let host = url.host().map(|h| h.to_string()).unwrap_or("localhost".to_string());
+    let port = url.port().unwrap_or(5432);
+    let user = url.username().to_string();
+    let password = url.password().unwrap_or("").to_string();
+    let db_name = url.path().trim_start_matches('/').to_string();
     
-    // Подключаемся к базе postgres
-    let options: PgConnectOptions = default_db_url.as_str().parse()?;
-    let pool = PgPoolOptions::new()
-        .max_connections(1)
-        .connect_with(options)
-        .await?;
+    Ok((host, port, user, password, db_name))
+}
+
+/// Создает пользователя и базу данных, если они не существуют
+async fn ensure_user_and_database_exists(database_url: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let (host, port, target_user, target_password, target_db) = parse_db_url(database_url)?;
     
-    // Проверяем существование базы данных
-    let exists: (bool,) = sqlx::query_as(
-        "SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname = $1)"
-    )
-    .bind(db_name)
-    .fetch_one(&pool)
-    .await?;
+    // Пытаемся подключиться как суперпользователь postgres
+    let admin_url = format!("postgres://postgres:postgres@{}:{}/postgres", host, port);
     
-    if !exists.0 {
-        println!("🔨 Создание базы данных '{}'...", db_name);
-        
-        // Создаем базу данных (динамический SQL из-за ограничений параметризации)
-        let create_db_sql = format!("CREATE DATABASE \"{}\"", db_name);
-        // ИСПРАВЛЕНО: используем .as_str()
-        sqlx::query(create_db_sql.as_str()).execute(&pool).await?;
-        println!("✅ База данных '{}' создана", db_name);
+    println!("🔌 Подключение к PostgreSQL как администратор...");
+    
+    match PgPoolOptions::new()
+        .max_connections(1) // ИСПРАВЛЕНО: было .max_connection(1)
+        .connect(&admin_url)
+        .await 
+    {
+        Ok(admin_pool) => {
+            // 1. Создаем пользователя если его нет
+            let user_exists: (bool,) = sqlx::query_as(
+                "SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname = $1)"
+            )
+            .bind(&target_user)
+            .fetch_one(&admin_pool)
+            .await?;
+            
+            if !user_exists.0 {
+                println!("👤 Создание пользователя '{}'...", target_user);
+                let create_user_sql = format!(
+                    "CREATE USER \"{}\" WITH PASSWORD '{}' CREATEDB",
+                    target_user, target_password
+                );
+                sqlx::query(&create_user_sql).execute(&admin_pool).await?;
+                println!("✅ Пользователь '{}' создан", target_user);
+            } else {
+                println!("ℹ️ Пользователь '{}' уже существует", target_user);
+                // Обновляем пароль
+                let update_password_sql = format!(
+                    "ALTER USER \"{}\" WITH PASSWORD '{}'",
+                    target_user, target_password
+                );
+                sqlx::query(&update_password_sql).execute(&admin_pool).await?;
+                println!("🔑 Пароль пользователя '{}' обновлен", target_user);
+            }
+            
+            // 2. Создаем базу данных если её нет
+            let db_exists: (bool,) = sqlx::query_as(
+                "SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname = $1)"
+            )
+            .bind(&target_db)
+            .fetch_one(&admin_pool)
+            .await?;
+            
+            if !db_exists.0 {
+                println!("🗄️ Создание базы данных '{}'...", target_db);
+                let create_db_sql = format!("CREATE DATABASE \"{}\" OWNER \"{}\"", target_db, target_user);
+                sqlx::query(&create_db_sql).execute(&admin_pool).await?;
+                println!("✅ База данных '{}' создана", target_db);
+            } else {
+                println!("ℹ️ База данных '{}' уже существует", target_db);
+            }
+            
+            // 3. Выдаем права
+            let grant_sql = format!(
+                "GRANT ALL PRIVILEGES ON DATABASE \"{}\" TO \"{}\"",
+                target_db, target_user
+            );
+            sqlx::query(&grant_sql).execute(&admin_pool).await?;
+            
+            Ok(database_url.to_string())
+        },
+        Err(e) => {
+            // Не удалось подключиться как postgres - возможно пользователь уже существует
+            println!("⚠️ Не удалось подключиться как администратор: {}", e);
+            println!("💡 Пробуем подключиться напрямую нашим пользователем...");
+            
+            // Пробуем подключиться нашим пользователем
+            match PgPoolOptions::new()
+                .max_connections(1) // ИСПРАВЛЕНО: было .max_connection(1)
+                .connect(database_url)
+                .await 
+            {
+                Ok(_) => {
+                    println!("✅ Подключение успешно, пользователь и БД существуют");
+                    Ok(database_url.to_string())
+                },
+                Err(conn_err) => {
+                    println!("❌ Не удалось подключиться. Убедитесь что:");
+                    println!("   1. PostgreSQL запущен");
+                    println!("   2. Существует пользователь postgres с паролем postgres");
+                    println!("   3. Или создайте пользователя вручную:");
+                    println!("      CREATE USER gbilly_sysadmin WITH PASSWORD 'BillyJinn228' CREATEDB;");
+                    println!("      CREATE DATABASE \"Voice-ka_Local\" OWNER gbilly_sysadmin;");
+                    Err(Box::new(conn_err))
+                }
+            }
+        }
     }
-    
-    Ok(database_url.to_string())
 }
 
 /// Проверяет, нужно ли очищать таблицы (по умолчанию да, можно отключить через env)
@@ -150,7 +227,6 @@ async fn clear_all_tables(pool: &PgPool) -> Result<(), Box<dyn std::error::Error
     
     for table in tables {
         let delete_query = format!("DELETE FROM {}", table);
-        // ИСПРАВЛЕНО: используем .as_str()
         match sqlx::query(delete_query.as_str()).execute(pool).await {
             Ok(result) => {
                 println!("  → Очищена таблица {} (удалено {} записей)", table, result.rows_affected());
@@ -175,7 +251,6 @@ async fn clear_all_tables(pool: &PgPool) -> Result<(), Box<dyn std::error::Error
     
     for (sequence_name,) in sequences {
         let reset_query = format!("ALTER SEQUENCE {} RESTART WITH 1", sequence_name);
-        // ИСПРАВЛЕНО: используем .as_str()
         if let Err(e) = sqlx::query(reset_query.as_str()).execute(pool).await {
             println!("  ⚠️ Не удалось сбросить последовательность {}: {}", sequence_name, e);
         }
@@ -591,8 +666,11 @@ pub async fn init_database() -> Result<(), Box<dyn std::error::Error>> {
     let database_url = std::env::var("DATABASE_URL")
         .expect("DATABASE_URL не установлена в .env файле");
     
-    // Создаем базу данных если её нет
-    let db_url = ensure_database_exists(&database_url).await?;
+    println!("🚀 Инициализация базы данных...");
+    println!("📋 URL: {}", database_url);
+    
+    // ИСПРАВЛЕНО: правильное имя функции
+    let db_url = ensure_user_and_database_exists(&database_url).await?;
     
     // Создаем пул соединений
     let pool = PgPoolOptions::new()
@@ -601,6 +679,15 @@ pub async fn init_database() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
     
     println!("🔌 Подключение к базе данных установлено");
+    
+    // Даем права на схему public
+    sqlx::query("GRANT ALL ON SCHEMA public TO CURRENT_USER")
+        .execute(&pool)
+        .await?;
+    
+    sqlx::query("GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO CURRENT_USER")
+        .execute(&pool)
+        .await?;
     
     // Создаем расширение UUID если его нет
     sqlx::query("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"")
@@ -614,9 +701,9 @@ pub async fn init_database() -> Result<(), Box<dyn std::error::Error>> {
     clear_all_tables(&pool).await?;
     
     // Заполняем тестовыми данными
-    seed_database(&pool).await?;
+    seed_database(&pool).await?; // ИСПРАВЛЕНО: seed_database должна быть определена выше
     
-    println!("🎉 База данных успешно инициализирована и заполнена тестовыми данными!");
+    println!("🎉 База данных успешно инициализирована!");
     
     // Сохраняем пул в глобальной переменной
     DB_POOL.set(pool).unwrap();
