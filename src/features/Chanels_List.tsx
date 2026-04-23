@@ -22,6 +22,10 @@ interface ChanelsListProps {
 export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps) {
     const [guilds, setGuilds] = useState<Guild[]>([]);
     const [loading, setLoading] = useState(true);
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [newGuildName, setNewGuildName] = useState("");
+    const [newGuildDescription, setNewGuildDescription] = useState("");
+    const [isCreating, setIsCreating] = useState(false);
 
     const getIcon = (icon: string | null) => {
         if (!icon) {
@@ -72,6 +76,49 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
         onGuildSelect(guildId);
     };
 
+    const handleCreateGuild = async () => {
+        if (!newGuildName.trim()) {
+            alert("Введите название канала");
+            return;
+        }
+
+        const userId = localStorage.getItem('user_id');
+        if (!userId) {
+            alert("Пользователь не авторизован");
+            return;
+        }
+
+        setIsCreating(true);
+        try {
+            const newGuild = await invoke<Guild>("create_guild", {
+                guildData: {
+                    name: newGuildName.trim(),
+                    description: newGuildDescription.trim() || null,
+                    owner_id: parseInt(userId),
+                    icon: null
+                }
+            });
+
+            // Обновляем список гильдий
+            await fetchGuilds();
+            
+            // Закрываем модальное окно
+            setShowCreateModal(false);
+            setNewGuildName("");
+            setNewGuildDescription("");
+            
+            // Автоматически выбираем новую гильдию
+            if (newGuild && newGuild.id) {
+                onGuildSelect(newGuild.id);
+            }
+        } catch (err) {
+            console.error("Ошибка создания канала:", err);
+            alert(err instanceof Error ? err.message : "Ошибка создания канала");
+        } finally {
+            setIsCreating(false);
+        }
+    };
+
     if (loading) {
         return (
             <footer className="chanels-container">
@@ -84,6 +131,15 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
         <footer className="chanels-container">
             <div className="chanel-list-block">
                 <div className="chanel-list">
+                    {/* Кнопка создания канала */}
+                    <button 
+                        className="create-guild-btn"
+                        onClick={() => setShowCreateModal(true)}
+                        title="Создать канал"
+                    >
+                        +
+                    </button>
+                    
                     {guilds.map((guild) => (
                         <Switch_Chanel_Button
                             key={guild.id}
@@ -97,6 +153,41 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
             </div>
             
             <Search_Chanel onGuildJoined={handleGuildJoined} />
+
+            {/* Модальное окно создания канала */}
+            {showCreateModal && (
+                <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
+                    <div className="modal-content create-guild-modal" onClick={(e) => e.stopPropagation()}>
+                        <h3>Создать канал</h3>
+                        
+                        <input
+                            type="text"
+                            placeholder="Название канала"
+                            value={newGuildName}
+                            onChange={(e) => setNewGuildName(e.target.value)}
+                            maxLength={100}
+                            autoFocus
+                        />
+                        
+                        <textarea
+                            placeholder="Описание (необязательно)"
+                            value={newGuildDescription}
+                            onChange={(e) => setNewGuildDescription(e.target.value)}
+                            rows={3}
+                            maxLength={500}
+                        />
+                        
+                        <div className="modal-buttons">
+                            <button onClick={() => setShowCreateModal(false)} disabled={isCreating}>
+                                Отмена
+                            </button>
+                            <button onClick={handleCreateGuild} disabled={isCreating}>
+                                {isCreating ? "Создание..." : "Создать"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </footer>
     );
 }

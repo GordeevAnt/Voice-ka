@@ -123,3 +123,129 @@ pub async fn join_guild_by_id(user_id: i32, guild_id: i32) -> Result<bool, Strin
     
     Ok(true)
 }
+
+/// Структура для создания новой гильдии
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CreateGuildData {
+    pub name: String,
+    pub description: Option<String>,
+    pub owner_id: i32,
+    pub icon: Option<String>,
+}
+
+/// Создание новой гильдии (канала)
+#[command]
+pub async fn create_guild(guild_data: CreateGuildData) -> Result<Guild, String> {
+    let pool = get_db_pool();
+    
+    // Проверяем, существует ли пользователь
+    let user_exists = sqlx::query_as::<_, ExistsResult>(
+        "SELECT EXISTS(SELECT 1 FROM users WHERE id = $1) as exists"
+    )
+    .bind(guild_data.owner_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| format!("Ошибка проверки пользователя: {}", e))?
+    .exists
+    .unwrap_or(false);
+    
+    if !user_exists {
+        return Err("Пользователь не найден".to_string());
+    }
+    
+    // Начинаем транзакцию
+    let mut transaction = pool
+        .begin()
+        .await
+        .map_err(|e| format!("Ошибка начала транзакции: {}", e))?;
+    
+    // Создаём гильдию
+    let guild = sqlx::query_as::<_, Guild>(
+        r#"
+        INSERT INTO guilds (name, description, owner_id, icon)
+        VALUES ($1, $2, $3, $4)
+        RETURNING 
+            id,
+            name,
+            icon,
+            owner_id,
+            description
+        "#
+    )
+    .bind(&guild_data.name)
+    .bind(&guild_data.description)
+    .bind(guild_data.owner_id)
+    .bind(&guild_data.icon)
+    .fetch_one(&mut *transaction)
+    .await
+    .map_err(|e| format!("Ошибка создания канала: {}", e))?;
+    
+    // Добавляем владельца в участники
+    sqlx::query(
+        r#"
+        INSERT INTO guild_members (user_id, guild_id, joined_at)
+        VALUES ($1, $2, NOW())
+        "#
+    )
+    .bind(guild_data.owner_id)
+    .bind(guild.id)
+    .execute(&mut *transaction)
+    .await
+    .map_err(|e| format!("Ошибка добавления владельца в канал: {}", e))?;
+    
+    // Создаём роль по умолчанию (администратор)
+    sqlx::query(
+        r#"
+        INSERT INTO roles (guild_id, name, position, permissions)
+        VALUES ($1, 'Admin', 0, -1)
+        "#
+    )
+    .bind(guild.id)
+    .execute(&mut *transaction)
+    .await
+    .map_err(|e| format!("Ошибка создания роли администратора: {}", e))?;
+    
+    // Создаём роль @everyone
+    sqlx::query(
+        r#"
+        INSERT INTO roles (guild_id, name, position, permissions)
+        VALUES ($1, '@everyone', 1, 0)
+        "#
+    )
+    .bind(guild.id)
+    .execute(&mut *transaction)
+    .await
+    .map_err(|e| format!("Ошибка создания роли @everyone: {}", e))?;
+    
+    // Создаём текстовую комнату по умолчанию
+    sqlx::query(
+        r#"
+        INSERT INTO rooms (name, type, guild_id, position)
+        VALUES ('general', 'text', $1, 0)
+        "#
+    )
+    .bind(guild.id)
+    .execute(&mut *transaction)
+    .await
+    .map_err(|e| format!("Ошибка создания комнаты по умолчанию: {}", e))?;
+    
+    // Создаём голосовую комнату по умолчанию
+    sqlx::query(
+        r#"
+        INSERT INTO rooms (name, type, guild_id, position)
+        VALUES ('General', 'voice', $1, 1)
+        "#
+    )
+    .bind(guild.id)
+    .execute(&mut *transaction)
+    .await
+    .map_err(|e| format!("Ошибка создания голосовой комнаты: {}", e))?;
+    
+    // Фиксируем транзакцию
+    transaction
+        .commit()
+        .await
+        .map_err(|e| format!("Ошибка фиксации транзакции: {}", e))?;
+    
+    Ok(guild)
+}

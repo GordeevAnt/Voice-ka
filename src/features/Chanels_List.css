@@ -45,3 +45,29 @@
     justify-content: flex-start;
     gap: 0.5vw;
 }
+
+.create-guild-btn {
+    border-radius: 10%;
+    background: #2a2a35;
+    border: none;
+    color: #7a6a7a;
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    margin-right: 4px;
+}
+
+.create-guild-btn:hover {
+    background: #3a3a45;
+    color: #9a8a9a;
+    transform: scale(1.05);
+    border-radius: 35%;
+}
+
+.create-guild-btn:active {
+    transform: scale(0.95);
+}
