@@ -1,20 +1,22 @@
+/* Switch_Room_Button.css - Готический стиль */
 .switch-room-wrapper {
     display: flex;
     align-items: center;
     padding: 8px 12px;
-    margin: 2px 8px;
-    border-radius: 8px;
+    margin: 1px 8px;
     cursor: pointer;
-    transition: background-color 0.2s;
     background-color: transparent;
+    transition: background-color 0.15s ease;
+    position: relative;
 }
 
 .switch-room-wrapper:hover {
-    background-color: #4a4c52;
+    background-color: #1e1e28;
 }
 
 .switch-room-wrapper.active {
-    background-color: #4a4c52;
+    background-color: #24242f;
+    border-left: 2px solid #5a4a5a;
 }
 
 .switch-room-content {
@@ -32,16 +34,17 @@
 }
 
 .room-icon {
-    font-size: 18px;
-    font-weight: 600;
-    color: #b9bbbe;
+    font-size: 16px;
+    color: #6a5a6a;
+    font-weight: 500;
 }
 
 .room-name {
     margin: 0;
-    font-size: 14px;
-    color: #ffffff;
-    font-weight: 500;
+    font-size: 13px;
+    color: #c0b0c0;
+    font-weight: 400;
+    font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
 }
 
 .room-right {
@@ -51,31 +54,39 @@
 }
 
 .member-count {
-    font-size: 12px;
-    color: #b9bbbe;
-    background-color: #2c2f33;
-    padding: 2px 6px;
-    border-radius: 12px;
+    font-size: 10px;
+    color: #6a5a6a;
+    background: #1e1e28;
+    padding: 2px 5px;
+    font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
 }
 
+/* Кнопка удаления комнаты - готический стиль */
 .delete-room-btn {
     background: none;
     border: none;
     cursor: pointer;
-    padding: 4px 8px;
-    border-radius: 4px;
+    padding: 4px 6px;
     font-size: 14px;
-    transition: background-color 0.2s;
-    color: #b9bbbe;
+    transition: all 0.2s ease;
+    color: #5a4a5a;
+    opacity: 0.6;
+    font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+    position: relative;
 }
 
 .delete-room-btn:hover {
-    background-color: #f04747;
-    color: white;
+    color: #8a5a6a;
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.delete-room-btn:active {
+    transform: scale(0.95);
 }
 
 /* Для поддержки фокуса с клавиатуры */
 .switch-room-wrapper:focus-visible {
-    outline: 2px solid #7289da;
-    outline-offset: 2px;
+    outline: 1px solid #5a4a5a;
+    outline-offset: -1px;
 }

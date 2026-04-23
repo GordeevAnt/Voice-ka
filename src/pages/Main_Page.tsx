@@ -11,13 +11,8 @@ import { Chanels_List } from "../features/Chanels_List"
 import { Logout } from "../entities/Logout"
 import { useState } from "react"
 
-//
-// Главная страница
-//
-
 export function Main_Page() {
     const [currentGuildId, setCurrentGuildId] = useState<number | null>(() => {
-        // Загружаем сохраненный канал из localStorage
         const savedGuildId = localStorage.getItem('current_guild_id');
         return savedGuildId ? parseInt(savedGuildId) : null;
     });
@@ -34,18 +29,19 @@ export function Main_Page() {
         localStorage.removeItem('current_room_id');
     };
 
-    // const handleRoomSelect = (roomId: number) => {
-    //     setCurrentRoomId(roomId);
-    //     localStorage.setItem('current_room_id', roomId.toString());
-    // };
+    const handleRoomSelect = (roomId: number) => {
+        setCurrentRoomId(roomId);
+        localStorage.setItem('current_room_id', roomId.toString());
+        console.log('Выбрана комната:', roomId);
+    };
 
-    // Если нет выбранного канала (guild) или нет пользователя
-    if (currentGuildId === -1) {
+    // Если нет выбранного канала
+    if (!currentGuildId) {
         return (
             <div className="main-page-container">
                 <div className="main-container"></div>
                 <Chanels_List 
-                    currentGuildId={currentGuildId}
+                    currentGuildId={currentGuildId ?? undefined}
                     onGuildSelect={handleGuildSelect}
                 />
             </div>
@@ -71,9 +67,9 @@ export function Main_Page() {
                     <div className="room-selector">
                         <Rooms_Online_List />
                         <Rooms_List 
-                            guildId={currentGuildId as number}
+                            guildId={currentGuildId}
                             currentRoomId={currentRoomId}
-                            onRoomSelect={setCurrentRoomId}
+                            onRoomSelect={handleRoomSelect}
                         />
                     </div>
                 
@@ -82,7 +78,7 @@ export function Main_Page() {
             </div>
 
             <Chanels_List 
-                currentGuildId={currentGuildId as number}
+                currentGuildId={currentGuildId}
                 onGuildSelect={handleGuildSelect}
             />
         

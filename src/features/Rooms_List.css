@@ -1,8 +1,10 @@
+/* Rooms_List.css - Готический стиль */
 .rooms-list-block {
-    background-color: #530a8f; /* ! */
+    background: #14141c;
     margin-right: 3px;
     flex: 1;
     overflow-y: auto;
+    border-left: 1px solid #2a2a35;
 }
 
 .rooms-list-block::-webkit-scrollbar {
@@ -10,18 +12,200 @@
 }
 
 .rooms-list-block::-webkit-scrollbar-thumb {
-    border-radius: 15px;
-    background-color: black;
+    border-radius: 0;
+    background-color: #3a2a3a;
+}
+
+.rooms-list-block::-webkit-scrollbar-thumb:hover {
+    background-color: #4a3a4a;
 }
 
 .rooms-list-block::-webkit-scrollbar-track {
-    border-radius: 15px;
-    background-color: grey;
+    background-color: #181820;
 }
 
 .rooms-list {
     display: flex;
     flex-direction: column;
+    align-items: stretch;
+    gap: 1px;
+}
+
+.rooms-header {
+    display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: 3px;
+    padding: 12px 12px 6px 12px;
+    border-bottom: 1px solid #2a2a35;
+    margin-bottom: 4px;
+}
+
+.rooms-header h3 {
+    margin: 0;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #7a6a7a;
+    font-weight: 500;
+    font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+}
+
+/* Кнопка создания комнаты - готический стиль */
+.create-room-btn {
+    background: none;
+    border: none;
+    color: #6a5a6a;
+    cursor: pointer;
+    font-size: 18px;
+    padding: 4px 8px;
+    transition: all 0.2s ease;
+    font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+    position: relative;
+    opacity: 0.7;
+}
+
+.create-room-btn::before {
+    font-size: 16px;
+    font-weight: normal;
+    margin-right: 2px;
+}
+
+.create-room-btn:hover {
+    color: #9a7a8a;
+    opacity: 1;
+    transform: scale(1.05);
+}
+
+.create-room-btn:active {
+    transform: scale(0.98);
+}
+
+.rooms-loading, .rooms-error {
+    text-align: center;
+    padding: 30px 20px;
+    color: #6a5a6a;
+    font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+    font-size: 12px;
+}
+
+.rooms-error button {
+    margin-top: 12px;
+    background: #20202a;
+    border: 1px solid #353540;
+    color: #7a6a7a;
+    padding: 4px 12px;
+    cursor: pointer;
+    font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+}
+
+.rooms-error button:hover {
+    background: #2a2a35;
+    color: #9a8a9a;
+}
+
+/* Модальное окно */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: #181820;
+    border: 1px solid #353540;
+    padding: 24px;
+    min-width: 320px;
+    box-shadow: 5px 5px 20px rgba(0, 0, 0, 0.5);
+}
+
+.modal-content h3 {
+    margin: 0 0 20px 0;
+    color: #8a7a8a;
+    text-align: center;
+    letter-spacing: 1px;
+    font-size: 16px;
+    font-weight: 500;
+    font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+}
+
+.modal-content input,
+.modal-content select,
+.modal-content textarea {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 14px;
+    background: #0e0e14;
+    border: 1px solid #353540;
+    color: #9a8a9a;
+    font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+    font-size: 13px;
+    box-sizing: border-box;
+}
+
+.modal-content input:focus,
+.modal-content select:focus,
+.modal-content textarea:focus {
+    outline: none;
+    border-color: #5a4a5a;
+    background: #14141c;
+}
+
+.modal-content textarea {
+    resize: vertical;
+    min-height: 60px;
+}
+
+.modal-content select option {
+    background: #0e0e14;
+    color: #9a8a9a;
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 20px;
+}
+
+/* Кнопки модального окна - готический стиль */
+.modal-buttons button {
+    padding: 7px 16px;
+    border: 1px solid #353540;
+    cursor: pointer;
+    font-size: 12px;
+    background: #20202a;
+    color: #7a6a7a;
+    transition: all 0.2s ease;
+    font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+    letter-spacing: 0.5px;
+}
+
+.modal-buttons button:first-child {
+    background: #14141c;
+    color: #6a5a6a;
+}
+
+.modal-buttons button:first-child:hover {
+    background: #1a1a24;
+    color: #8a7a8a;
+    border-color: #4a3a4a;
+}
+
+.modal-buttons button:last-child {
+    background: #1a1a24;
+    color: #7a6a7a;
+    border-color: #4a3a4a;
+}
+
+.modal-buttons button:last-child:hover {
+    background: #2a1a2a;
+    color: #a08090;
+    border-color: #6a4a5a;
 }

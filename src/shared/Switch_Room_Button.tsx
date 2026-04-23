@@ -5,29 +5,20 @@ type Props = {
     roomId: number;
     name: string;
     isActive?: boolean;
-    memberCount?: number | null;
+    // memberCount?: number | null;
     onSelect?: (roomId: number) => void;
-    onDelete?: (roomId: number) => void;
 };
 
 export const Switch_Room_Button = memo(({ 
     roomId, 
     name, 
     isActive, 
-    memberCount, 
+    // memberCount, 
     onSelect,
-    onDelete 
 }: Props) => {
     const handleClick = () => {
         if (onSelect) {
             onSelect(roomId);
-        }
-    };
-    
-    const handleDelete = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (onDelete) {
-            onDelete(roomId);
         }
     };
     
@@ -49,19 +40,9 @@ export const Switch_Room_Button = memo(({
                     <p className="room-name">{name}</p>
                 </div>
                 <div className="room-right">
-                    {memberCount !== undefined && memberCount !== null && (
+                    {/* {memberCount !== undefined && memberCount !== null && (
                         <span className="member-count">{memberCount}</span>
-                    )}
-                    {onDelete && (
-                        <button 
-                            className="delete-room-btn" 
-                            onClick={handleDelete}
-                            title="Удалить комнату"
-                            type="button"
-                        >
-                            🗑️
-                        </button>
-                    )}
+                    )} */}
                 </div>
             </div>
         </div>
