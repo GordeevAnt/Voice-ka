@@ -1,4 +1,5 @@
 use sqlx::postgres::PgPoolOptions;
+use sqlx::types::Json;  // Добавьте этот импорт
 use argon2::{
     password_hash::{rand_core::OsRng, SaltString},
     Argon2, PasswordHasher
@@ -27,7 +28,7 @@ pub async fn register(login: String, email: String, password: String, confirm_pa
     
     let pool = PgPoolOptions::new()
         .max_connections(5)
-        .connect("postgresql://gbilly_sysadmin:BillyJinn228@localhost/Voice-ka_Local")
+        .connect("postgresql://gbilly_sysadmin:BillyJinn228@localhost:5433/Voice-ka_Local")
         .await
         .map_err(|e| e.to_string())?;
     
@@ -173,24 +174,31 @@ pub async fn register(login: String, email: String, password: String, confirm_pa
     
     sqlx::query(
         "INSERT INTO voice_presets (user_id, name, effects, is_global, guild_id, created_at, updated_at)
-        VALUES ($1, 'Чистый голос', $2::jsonb, false, NULL, $3, $3)"
+        VALUES ($1, $2, $3, false, NULL, $4, $4)"
     )
     .bind(user_id)
-    .bind(default_effects.to_string())
+    .bind("Чистый голос")
+    .bind(Json(&default_effects))  // Используем Json тип
     .bind(Utc::now())
     .execute(&mut *transaction)
     .await
     .map_err(|e| format!("Ошибка создания голосового пресета: {}", e))?;
     
+    // Создаем данные для аудит-лога
+    let audit_data = json!({
+        "username": login,
+        "email": email
+    });
+    
     // Добавляем запись в аудит-лог
     sqlx::query(
         "INSERT INTO audit_logs (guild_id, user_id, action_type, target_id, changes, created_at)
-        VALUES ($1, $2, 'USER_REGISTER', $3, $4::jsonb, $5)"
+        VALUES ($1, $2, 'USER_REGISTER', $3, $4, $5)"
     )
     .bind(guild_id)
     .bind(user_id)
     .bind(user_id)
-    .bind(json!({"username": login, "email": email}).to_string())
+    .bind(Json(&audit_data))  // Используем Json тип
     .bind(Utc::now())
     .execute(&mut *transaction)
     .await

@@ -6,7 +6,7 @@ use serde_json::json;
 pub async fn logout(user_id: i32, session_id: Option<String>) -> Result<bool, String> {
     let pool = PgPoolOptions::new()
         .max_connections(5)
-        .connect("postgresql://gbilly_sysadmin:BillyJinn228@localhost/Voice-ka_Local")
+        .connect("postgresql://gbilly_sysadmin:BillyJinn228@localhost:5433/Voice-ka_Local")
         .await
         .map_err(|e| e.to_string())?;
     

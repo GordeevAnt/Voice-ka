@@ -11,7 +11,7 @@ use uuid::Uuid;
 pub async fn login(login: String, password: String, ip_address: Option<String>, user_agent: Option<String>) -> Result<(bool, i32, String), String> {
     let pool = PgPoolOptions::new()
         .max_connections(5)
-        .connect("postgresql://gbilly_sysadmin:BillyJinn228@localhost/Voice-ka_Local")
+        .connect("postgresql://gbilly_sysadmin:BillyJinn228@localhost:5433/Voice-ka_Local")
         .await
         .map_err(|e| e.to_string())?;
     

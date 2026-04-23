@@ -1,7 +1,9 @@
-# Tauri + React + Typescript
+# Запуск приложения
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+Читать README в папке /setup
 
-## Recommended IDE Setup
+# Команды приложения
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+1) npm run tauri dev - режим разработчика
+2) npm run test      - режим тестирования
+3) npm run migration - режим миграции

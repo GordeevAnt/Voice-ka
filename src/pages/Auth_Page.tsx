@@ -75,9 +75,9 @@ export function Auth_Page() {
                 <input className="login" placeholder="Логин" onChange={handleLoginChange} value={loginValue}></input>
                 <input className="password" placeholder="Пароль" onChange={handlePasswordChange} value={passwordValue}></input>
 
-                <div className="lost-password-btn-container">
+                {/* <div className="lost-password-btn-container">
                     <button>Забыли пароль</button>
-                </div>
+                </div> */}
                 
                 <div className="auth-buttons">
                     <button className="auth-form-btn auth" onClick={handleLogin}>
