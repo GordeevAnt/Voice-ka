@@ -18,6 +18,7 @@ use db::init_database;
 pub mod logic;
 use logic::{
     get_room_messages,
+    send_message,
     get_user_guilds,
     get_guild_rooms,
     find_guild_by_id,
@@ -29,6 +30,10 @@ use logic::{
     delete_room,
     create_dm_room,
     get_current_user,
+    get_current_user_simple,
+    get_user_stats,
+    update_user_profile,
+    get_user_guilds_with_role,
     create_guild,
 };
 
@@ -52,6 +57,7 @@ pub fn run() {
             logout,
             register,
             get_room_messages,
+            send_message,
             get_user_guilds,
             get_guild_rooms,
             find_guild_by_id,
@@ -63,6 +69,10 @@ pub fn run() {
             delete_room,
             create_dm_room,
             get_current_user,
+            get_current_user_simple,
+            get_user_stats,
+            update_user_profile,
+            get_user_guilds_with_role,
             create_guild,
         ])
         .run(tauri::generate_context!())

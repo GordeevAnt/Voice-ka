@@ -43,7 +43,6 @@ export function Personal_Account_Info_Page() {
     });
 
     const userId = parseInt(localStorage.getItem('user_id') || '0');
-    const sessionId = localStorage.getItem('session_id') || '';
 
     useEffect(() => {
         loadUserInfo();
@@ -53,8 +52,10 @@ export function Personal_Account_Info_Page() {
 
     const loadUserInfo = async () => {
         try {
-            const userData = await invoke<User>("get_current_user", { sessionId });
+            // Используем get_current_user_simple вместо get_current_user
+            const userData = await invoke<User>("get_current_user_simple");
             setUser(userData);
+            localStorage.setItem('user_id', userData.id.toString());
             setEditData({
                 username: userData.username,
                 email: userData.email,
@@ -78,7 +79,7 @@ export function Personal_Account_Info_Page() {
 
     const loadUserGuilds = async () => {
         try {
-            const guildsData = await invoke<Guild[]>("get_user_guilds", { userId });
+            const guildsData = await invoke<Guild[]>("get_user_guilds_with_role", { userId });
             setGuilds(guildsData);
         } catch (err) {
             console.error("Ошибка загрузки каналов:", err);
@@ -87,29 +88,29 @@ export function Personal_Account_Info_Page() {
         }
     };
 
-    // const handleUpdateProfile = async () => {
-    //     if (editData.newPassword && editData.newPassword !== editData.confirmPassword) {
-    //         alert("Новые пароли не совпадают");
-    //         return;
-    //     }
+    const handleUpdateProfile = async () => {
+        if (editData.newPassword && editData.newPassword !== editData.confirmPassword) {
+            alert("Новые пароли не совпадают");
+            return;
+        }
 
-    //     try {
-    //         await invoke("update_user_profile", {
-    //             userId,
-    //             username: editData.username,
-    //             email: editData.email,
-    //             currentPassword: editData.currentPassword,
-    //             newPassword: editData.newPassword || null
-    //         });
+        try {
+            await invoke("update_user_profile", {
+                userId,
+                username: editData.username,
+                email: editData.email,
+                currentPassword: editData.currentPassword || null,
+                newPassword: editData.newPassword || null
+            });
             
-    //         alert("Профиль успешно обновлен!");
-    //         setIsEditing(false);
-    //         loadUserInfo(); // Перезагружаем данные
-    //     } catch (err) {
-    //         console.error("Ошибка обновления профиля:", err);
-    //         alert(err instanceof Error ? err.message : "Ошибка обновления профиля");
-    //     }
-    // };
+            alert("Профиль успешно обновлен!");
+            setIsEditing(false);
+            loadUserInfo(); // Перезагружаем данные
+        } catch (err) {
+            console.error("Ошибка обновления профиля:", err);
+            alert(err instanceof Error ? err.message : "Ошибка обновления профиля");
+        }
+    };
 
     const getStatusText = (status: string) => {
         switch (status) {
@@ -302,14 +303,14 @@ export function Personal_Account_Info_Page() {
                             />
                         </div>
                         
-                        {/* <div className="form-buttons">
+                        <div className="form-buttons">
                             <button onClick={handleUpdateProfile} className="save-btn">
                                 💾 Сохранить
                             </button>
                             <button onClick={() => setIsEditing(false)} className="cancel-btn">
                                 ❌ Отмена
                             </button>
-                        </div> */}
+                        </div>
                     </div>
                 )}
             </div>

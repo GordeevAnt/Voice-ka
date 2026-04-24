@@ -22,7 +22,16 @@ pub use room::{
 };
 
 pub mod message;
-pub use message::get_room_messages;
+pub use message::{
+    get_room_messages,
+    send_message,
+};
 
 pub mod user;
-pub use user::get_current_user;
+pub use user::{
+    get_current_user,
+    get_current_user_simple,
+    get_user_stats,
+    update_user_profile,
+    get_user_guilds_with_role,
+};

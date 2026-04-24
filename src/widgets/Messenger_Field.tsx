@@ -1,15 +1,32 @@
-import { Messages_List } from "./Messages_List"
-import { Message_Input } from "./Message_Input"
+import { Messages_List } from "./Messages_List";
+import { Message_Input } from "./Message_Input";
+import "./Messenger_Field.css";
+import { useState } from "react";
 
-import "./Messenger_Field.css"
+interface MessengerFieldProps {
+    roomId: number;
+    currentUserId?: number;
+}
 
-//
-// Виджет общения (текст/аудио/видео)
-//
+export function Messenger_Field({ roomId, currentUserId }: MessengerFieldProps) {
+    const [refreshKey, setRefreshKey] = useState(0);
 
-export function Messenger_Field() {
-    return <div className="messenger-field">
-        <Messages_List />
-        <Message_Input />
-    </div>
+    const handleMessageSent = () => {
+        // Обновляем ключ для перезагрузки сообщений
+        setRefreshKey(prev => prev + 1);
+    };
+
+    return (
+        <div className="messenger-field">
+        <Messages_List 
+            key={refreshKey}
+            roomId={roomId} 
+            currentUserId={currentUserId} 
+        />
+        <Message_Input 
+            roomId={roomId} 
+            onMessageSent={handleMessageSent} 
+        />
+        </div>
+    );
 }

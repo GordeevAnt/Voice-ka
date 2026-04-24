@@ -20,6 +20,7 @@ export function Main_Page() {
         const savedRoomId = localStorage.getItem('current_room_id');
         return savedRoomId ? parseInt(savedRoomId) : undefined;
     });
+    const [currentUserId, setCurrentUserId] = useState<number>(1); // ID текущего пользователя
 
     const handleGuildSelect = (guildId: number) => {
         setCurrentGuildId(guildId);
@@ -55,7 +56,7 @@ export function Main_Page() {
             
             <div className="main-container">
 
-                <Messenger_Field />
+                <Messenger_Field roomId={currentRoomId as number} currentUserId={currentUserId} />
 
                 <div className="room-container">
                     

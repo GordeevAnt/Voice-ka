@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use tauri::command;
 use chrono::{DateTime, Utc};
 use crate::db::get_db_pool;
+use crate::logic::user::get_current_user;
 
 #[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
 pub struct MessageData {
@@ -47,4 +48,42 @@ pub async fn get_room_messages(room_id: i32) -> Result<Vec<MessageData>, String>
     .map_err(|e| format!("Ошибка загрузки сообщений: {}", e))?;
     
     Ok(messages)
+}
+
+#[command]
+pub async fn send_message(room_id: i32, content: String, session_id: Option<String>) -> Result<MessageData, String> {
+    let pool = get_db_pool();
+    
+    // Получаем текущего пользователя с session_id
+    let current_user = get_current_user(session_id)
+        .await
+        .map_err(|e| format!("Ошибка получения пользователя: {}", e))?;
+    
+    let user_id = current_user.id;
+    
+    let message = sqlx::query_as::<_, MessageData>(
+        r#"
+        INSERT INTO messages (room_id, user_id, content, attachments)
+        VALUES ($1, $2, $3, '[]'::jsonb)
+        RETURNING 
+            id, 
+            room_id, 
+            user_id, 
+            content,
+            attachments,
+            reply_to_id, 
+            edited_at, 
+            deleted_at, 
+            created_at,
+            (SELECT username FROM users WHERE id = $2) as author_name
+        "#
+    )
+    .bind(room_id)
+    .bind(user_id)
+    .bind(content)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| format!("Ошибка отправки сообщения: {}", e))?;
+    
+    Ok(message)
 }
