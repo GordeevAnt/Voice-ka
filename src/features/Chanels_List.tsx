@@ -129,16 +129,15 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
 
     return (
         <footer className="chanels-container">
+            <button 
+                className="create-guild-btn"
+                onClick={() => setShowCreateModal(true)}
+                title="Создать канал"
+            >
+                +
+            </button>
             <div className="chanel-list-block">
                 <div className="chanel-list">
-                    {/* Кнопка создания канала */}
-                    <button 
-                        className="create-guild-btn"
-                        onClick={() => setShowCreateModal(true)}
-                        title="Создать канал"
-                    >
-                        +
-                    </button>
                     
                     {guilds.map((guild) => (
                         <Switch_Chanel_Button
@@ -154,7 +153,6 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
             
             <Search_Chanel onGuildJoined={handleGuildJoined} />
 
-            {/* Модальное окно создания канала */}
             {showCreateModal && (
                 <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
                     <div className="modal-content create-guild-modal" onClick={(e) => e.stopPropagation()}>

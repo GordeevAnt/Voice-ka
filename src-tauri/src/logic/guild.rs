@@ -1,5 +1,6 @@
 // src-tauri/src/logic/guild.rs
 
+use chrono::{DateTime, Utc};
 use serde::{Serialize, Deserialize};
 use tauri::command;
 use crate::db::get_db_pool;
@@ -248,4 +249,39 @@ pub async fn create_guild(guild_data: CreateGuildData) -> Result<Guild, String> 
         .map_err(|e| format!("Ошибка фиксации транзакции: {}", e))?;
     
     Ok(guild)
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct GuildMember {
+    pub user_id: i32,
+    pub username: String,
+    pub avatar: Option<String>,
+    pub nickname: Option<String>,
+    pub joined_at: DateTime<Utc>,
+}
+
+#[command]
+pub async fn get_guild_members(guild_id: i32) -> Result<Vec<GuildMember>, String> {
+    let pool = get_db_pool();
+    
+    let members = sqlx::query_as::<_, GuildMember>(
+        r#"
+        SELECT 
+            u.id as user_id,
+            u.username,
+            u.avatar,
+            gm.nickname,
+            gm.joined_at
+        FROM guild_members gm
+        JOIN users u ON gm.user_id = u.id
+        WHERE gm.guild_id = $1
+        ORDER BY gm.joined_at ASC
+        "#
+    )
+    .bind(guild_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| format!("Ошибка загрузки участников: {}", e))?;
+    
+    Ok(members)
 }

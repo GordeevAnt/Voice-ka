@@ -2,6 +2,7 @@
 pub mod guild;
 pub use guild::{
     get_user_guilds,
+    get_guild_members,
     find_guild_by_id,
     join_guild_by_id,
     create_guild,

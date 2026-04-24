@@ -39,7 +39,9 @@ export function Main_Page() {
     if (!currentGuildId) {
         return (
             <div className="main-page-container">
-                <div className="main-container"></div>
+                <div className="main-container">
+                    <div>Красивая картинка-заглушка</div>
+                </div>
                 <Chanels_List 
                     currentGuildId={currentGuildId ?? undefined}
                     onGuildSelect={handleGuildSelect}
