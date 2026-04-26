@@ -111,7 +111,7 @@ export function Search_Chanel({ onGuildJoined }: SearchChanelProps) {
     return (
         <>
             <button className="search-chanel-btn" onClick={handleOpenModal}>
-                <img src="./public/grey-search.svg" alt="Поиск канала" />
+                <img src="/grey-search.svg" alt="Поиск канала" />
             </button>
 
             {isModalOpen && (

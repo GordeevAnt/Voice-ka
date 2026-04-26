@@ -32,7 +32,7 @@ export function Message_Input({ roomId, onMessageSent }: MessageInputProps) {
     return (
         <div className="message-input-container">
         <div className="message-input-block">
-            <button id="message-smile">Смайлик</button>
+            {/* <button id="message-smile">Смайлик</button> */}
             <input
             id="message-input"
             placeholder="Напиши сообщение :)"
@@ -40,7 +40,7 @@ export function Message_Input({ roomId, onMessageSent }: MessageInputProps) {
             onChange={(e) => setContent(e.target.value)}
             onKeyPress={handleKeyPress}
             />
-            <button id="message-file">Файл</button>
+            {/* <button id="message-file">Файл</button> */}
             <button className="send-btn" onClick={handleSend}>
             Отправить
             </button>
