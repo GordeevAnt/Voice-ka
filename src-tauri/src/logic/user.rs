@@ -96,13 +96,13 @@ pub async fn get_user_stats(user_id: i32) -> Result<UserStats, String> {
     .map_err(|e| format!("Ошибка подсчета каналов: {}", e))?;
     
     // Получаем информацию о пользователе для дат
-    let user_info: User = sqlx::query_as::<_, User>(
-        "SELECT id, username, email, avatar, status FROM users WHERE id = $1"
-    )
-    .bind(user_id)
-    .fetch_one(pool)
-    .await
-    .map_err(|e| format!("Ошибка получения информации о пользователе: {}", e))?;
+    // let user_info: User = sqlx::query_as::<_, User>(
+    //     "SELECT id, username, email, avatar, status FROM users WHERE id = $1"
+    // )
+    // .bind(user_id)
+    // .fetch_one(pool)
+    // .await
+    // .map_err(|e| format!("Ошибка получения информации о пользователе: {}", e))?;
     
     // Получаем дату регистрации и последнего визита
     let registration_date: chrono::DateTime<chrono::Utc> = sqlx::query_scalar(

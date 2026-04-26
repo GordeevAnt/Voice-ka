@@ -28,35 +28,35 @@ export const Message = memo(({
     text, 
     timestamp, 
     isCurrentUser,
-    onDelete,
-    onEdit 
+    // onDelete,
+    // onEdit 
     }: MessageProps) => {
     
-    const handleDelete = () => {
-        if (onDelete && window.confirm("Удалить сообщение?")) {
-        onDelete(id);
-        }
-    };
+    // const handleDelete = () => {
+    //     if (onDelete && window.confirm("Удалить сообщение?")) {
+    //     onDelete(id);
+    //     }
+    // };
 
     return (
-        <div className={`message ${isCurrentUser ? "message-current-user" : ""}`}>
-        <div className="message-avatar-block">
-            {author[0]?.toUpperCase() || "?"}
-        </div>
-        <div className="message-content">
-            <div className="message-header">
-            <span className="message-author">{author}</span>
-            <span className="message-time">{timestamp}</span>
+        <div id={id.toString()} className={`message ${isCurrentUser ? "message-current-user" : ""}`}>
+            <div className="message-avatar-block">
+                {author[0]?.toUpperCase() || "?"}
             </div>
-            <div className="message-text-block">{text}</div>
-        </div>
-        {isCurrentUser && (
-            <div className="message-actions">
-            <button onClick={handleDelete} className="message-delete-btn">
-                🗑️
-            </button>
+            <div className="message-content">
+                <div className="message-header">
+                <span className="message-author">{author}</span>
+                <span className="message-time">{timestamp}</span>
+                </div>
+                <div className="message-text-block">{text}</div>
             </div>
-        )}
+            {/* {isCurrentUser && (
+                <div className="message-actions">
+                <button onClick={handleDelete} className="message-delete-btn">
+                    🗑️
+                </button>
+                </div>
+            )} */}
         </div>
     );
 }, areEqual);
