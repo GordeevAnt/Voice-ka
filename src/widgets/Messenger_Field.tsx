@@ -1,7 +1,8 @@
+// widgets/Messenger_Field.tsx
 import { Messages_List } from "./Messages_List";
 import { Message_Input } from "./Message_Input";
 import "./Messenger_Field.css";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface MessengerFieldProps {
     roomId: number;
@@ -11,22 +12,27 @@ interface MessengerFieldProps {
 export function Messenger_Field({ roomId, currentUserId }: MessengerFieldProps) {
     const [refreshKey, setRefreshKey] = useState(0);
 
+    // Обновляем ключ при смене roomId
+    useEffect(() => {
+        setRefreshKey(prev => prev + 1);
+    }, [roomId]);
+
     const handleMessageSent = () => {
-        // Обновляем ключ для перезагрузки сообщений
         setRefreshKey(prev => prev + 1);
     };
 
     return (
         <div className="messenger-field">
-        <Messages_List 
-            key={refreshKey}
-            roomId={roomId} 
-            currentUserId={currentUserId} 
-        />
-        <Message_Input 
-            roomId={roomId} 
-            onMessageSent={handleMessageSent} 
-        />
+            <Messages_List 
+                key={`messages-${refreshKey}`}
+                roomId={roomId} 
+                currentUserId={currentUserId} 
+            />
+            <Message_Input 
+                key={`input-${roomId}`}
+                roomId={roomId} 
+                onMessageSent={handleMessageSent} 
+            />
         </div>
     );
 }

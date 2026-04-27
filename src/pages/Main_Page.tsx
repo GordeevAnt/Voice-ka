@@ -1,3 +1,4 @@
+// Main_Page.tsx
 import { Messenger_Field } from "../widgets/Messenger_Field"
 import Info_Chanel_Button from "../shared/Info_Chanel_Button"
 import Info_Room_Button from "../shared/Info_Room_Button"
@@ -36,7 +37,6 @@ export function Main_Page() {
                 return;
             }
             
-            // Проверяем текущего пользователя
             try {
                 const currentUser = await invoke("get_current_user", { 
                     sessionId: sessionId 
@@ -44,14 +44,12 @@ export function Main_Page() {
                 console.log('Current user in Main:', currentUser);
             } catch (error) {
                 console.error('Failed to get current user:', error);
-                // Если сессия невалидна, перенаправляем на авторизацию
                 navigate('/', { replace: true });
                 return;
             }
             
             setCurrentUserId(parseInt(userId as string));
             
-            // Восстанавливаем сохранённые guild_id и room_id
             const savedGuildId = await storeAPI.get('current_guild_id');
             if (savedGuildId) {
                 setCurrentGuildId(parseInt(savedGuildId as string));
@@ -91,7 +89,6 @@ export function Main_Page() {
                 <div className="main-container">
                     <div className="welcome-placeholder">
                         <h2>Добро пожаловать!</h2>
-                        <p>Выберите канал слева</p>
                     </div>
                 </div>
                 <Chanels_List 
@@ -107,7 +104,15 @@ export function Main_Page() {
             
             <div className="main-container">
 
-                <Messenger_Field roomId={currentRoomId as number} currentUserId={currentUserId} />
+                {currentRoomId ? (
+                    <Messenger_Field 
+                        key={`messenger-${currentGuildId}-${currentRoomId}`}
+                        roomId={currentRoomId} 
+                        currentUserId={currentUserId} 
+                    />
+                ) : (
+                    <div className="messenger-field"></div>
+                )}
 
                 <div className="room-container">
                     
@@ -119,8 +124,12 @@ export function Main_Page() {
                     </div>
                     
                     <div className="room-selector">
-                        <Rooms_Online_List />
+                        <Rooms_Online_List 
+                            key={`online-${currentGuildId}`}
+                            guildId={currentGuildId}
+                        />
                         <Rooms_List 
+                            key={`rooms-${currentGuildId}`}
                             guildId={currentGuildId}
                             currentRoomId={currentRoomId}
                             onRoomSelect={handleRoomSelect}

@@ -58,7 +58,6 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
             return;
         }
         
-        // Получаем ID текущего пользователя из storeAPI
         const userId = await storeAPI.get<string>('user_id');
         if (!userId) {
             alert("Пользователь не авторизован");
@@ -133,7 +132,6 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
                 ))}
             </div>
             
-            {/* Модальное окно создания комнаты */}
             {showCreateModal && (
                 <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}>

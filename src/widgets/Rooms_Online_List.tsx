@@ -1,7 +1,6 @@
 // widgets/Rooms_Online_List.tsx
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { storeAPI } from "../features/useStore";
 import "./Rooms_Online_List.css";
 
 interface OnlineUser {
@@ -11,35 +10,39 @@ interface OnlineUser {
     status: string;
 }
 
-export function Rooms_Online_List() {
+interface RoomsOnlineListProps {
+    guildId?: number;
+}
+
+export function Rooms_Online_List({ guildId }: RoomsOnlineListProps) {
     const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const loadOnlineUsers = async () => {
-            try {
-                const guildId = await storeAPI.get<string>('current_guild_id');
-                if (!guildId) {
-                    setLoading(false);
-                    return;
-                }
+        if (!guildId) {
+            setOnlineUsers([]);
+            setLoading(false);
+            return;
+        }
 
+        const loadOnlineUsers = async () => {
+            setLoading(true);
+            try {
                 const users = await invoke<OnlineUser[]>("get_online_guild_members", { 
-                    guildId: parseInt(guildId) 
+                    guildId: guildId
                 });
-                
                 setOnlineUsers(users);
             } catch (error) {
                 console.error("Ошибка загрузки онлайн пользователей:", error);
+                setOnlineUsers([]);
             } finally {
                 setLoading(false);
             }
         };
 
         loadOnlineUsers();
-    }, []);
+    }, [guildId]);
 
-    // Функция для получения инициалов из имени
     const getInitials = (username: string) => {
         return username
             .split(' ')
@@ -49,7 +52,6 @@ export function Rooms_Online_List() {
             .slice(0, 2);
     };
 
-    // Функция для получения цвета аватара на основе имени
     const getAvatarColor = (username: string) => {
         const colors = [
             '#1abc9c', '#2ecc71', '#3498db', '#9b59b6', '#34495e',
@@ -79,6 +81,7 @@ export function Rooms_Online_List() {
 
     return (
         <div className="rooms-online-list-block">
+            <></>
             <div className="rooms-online-list">
                 {onlineUsers.length === 0 ? (
                     <div className="no-online-users">Нет пользователей онлайн</div>
