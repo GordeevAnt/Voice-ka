@@ -244,10 +244,6 @@ export function Personal_Account_Info_Page() {
                                     <div className="stat-label">Сообщений</div>
                                 </div>
                                 <div className="stat-card">
-                                    <div className="stat-value">{formatVoiceTime(stats?.total_voice_time || 0)}</div>
-                                    <div className="stat-label">В голосовых каналах</div>
-                                </div>
-                                <div className="stat-card">
                                     <div className="stat-value">{stats?.total_guilds || 0}</div>
                                     <div className="stat-label">Каналов</div>
                                 </div>

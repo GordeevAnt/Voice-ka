@@ -210,3 +210,37 @@ pub async fn get_user_guilds_with_role(user_id: i32) -> Result<Vec<serde_json::V
     
     Ok(result)
 }
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct UserStatus {
+    pub user_id: i32,
+    pub username: String,
+    pub avatar: Option<String>,
+    pub status: String,
+}
+
+#[command]
+pub async fn get_online_guild_members(guild_id: i32) -> Result<Vec<UserStatus>, String> {
+    let pool = get_db_pool();
+    
+    let members = sqlx::query_as::<_, UserStatus>(
+        r#"
+        SELECT 
+            u.id as user_id,
+            u.username,
+            u.avatar,
+            u.status
+        FROM guild_members gm
+        JOIN users u ON gm.user_id = u.id
+        WHERE gm.guild_id = $1 
+          AND u.status IN ('online', 'idle', 'dnd')
+        ORDER BY u.username ASC
+        "#
+    )
+    .bind(guild_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| format!("Ошибка загрузки онлайн пользователей: {}", e))?;
+    
+    Ok(members)
+}

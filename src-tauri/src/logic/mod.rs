@@ -31,6 +31,7 @@ pub mod user;
 pub use user::{
     get_current_user,
     get_current_user_simple,
+    get_online_guild_members,
     get_user_stats,
     update_user_profile,
     get_user_guilds_with_role,
