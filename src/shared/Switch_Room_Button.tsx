@@ -17,6 +17,11 @@ export const Switch_Room_Button = memo(({
     onSelect,
 }: Props) => {
     const handleClick = () => {
+        // Запрещаем нажатие, если комната уже активна
+        if (isActive) {
+            return;
+        }
+        
         if (onSelect) {
             onSelect(roomId);
         }
@@ -27,8 +32,11 @@ export const Switch_Room_Button = memo(({
             className={`switch-room-wrapper ${isActive ? "active" : ""}`}
             onClick={handleClick}
             role="button"
-            tabIndex={0}
+            tabIndex={isActive ? -1 : 0}  // Убираем из фокуса активную комнату
+            style={{ cursor: isActive ? 'default' : 'pointer' }}  // Меняем курсор для активной
             onKeyPress={(e) => {
+                if (isActive) return;  // Запрещаем клавиатурную активацию
+                
                 if (e.key === 'Enter' || e.key === ' ') {
                     handleClick();
                 }
@@ -38,11 +46,6 @@ export const Switch_Room_Button = memo(({
                 <div className="room-info">
                     <span className="room-icon">#</span>
                     <p className="room-name">{name}</p>
-                </div>
-                <div className="room-right">
-                    {/* {memberCount !== undefined && memberCount !== null && (
-                        <span className="member-count">{memberCount}</span>
-                    )} */}
                 </div>
             </div>
         </div>

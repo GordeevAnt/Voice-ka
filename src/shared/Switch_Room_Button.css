@@ -19,6 +19,22 @@
     border-left: 2px solid #5a4a5a;
 }
 
+.switch-room-wrapper.active:hover {
+    background-color: #24242f;  /* Оставляем тот же цвет, что и у активной */
+    cursor: default;
+}
+
+.switch-room-wrapper:not(.active) {
+    cursor: pointer;
+}
+
+.switch-room-wrapper {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
 .switch-room-content {
     display: flex;
     justify-content: space-between;
