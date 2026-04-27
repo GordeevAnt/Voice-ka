@@ -3,6 +3,7 @@ import { Switch_Chanel_Button } from "../shared/Switch_Chanel_Button";
 import { invoke } from "@tauri-apps/api/core";
 import "./Chanels_List.css";
 import { Search_Chanel } from "../shared/Search_Chanel";
+import { storeAPI } from "../features/useStore";
 
 // Интерфейс канала
 interface Guild {
@@ -43,7 +44,7 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
     const fetchGuilds = async () => {
         try {
             setLoading(true);
-            const userId = localStorage.getItem('user_id');
+            const userId = await storeAPI.get<string>('user_id');
             
             if (!userId) {
                 console.error("Пользователь не авторизован");
@@ -82,7 +83,7 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
             return;
         }
 
-        const userId = localStorage.getItem('user_id');
+        const userId = await storeAPI.get<string>('user_id');
         if (!userId) {
             alert("Пользователь не авторизован");
             return;

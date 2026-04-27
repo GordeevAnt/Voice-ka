@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
+import { storeAPI } from "../features/useStore";
 import "./Info_Pages.css";
 
 interface Room {
@@ -33,6 +34,7 @@ export function Room_Info_Page() {
     const [users, setUsers] = useState<RoomUser[]>([]);
     const [loading, setLoading] = useState(true);
     const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+    const [roomId, setRoomId] = useState<number>(0);
     const [isEditing, setIsEditing] = useState(false);
     const [editData, setEditData] = useState({
         name: "",
@@ -41,16 +43,30 @@ export function Room_Info_Page() {
         user_limit: 0
     });
 
-    const roomId = parseInt(localStorage.getItem('current_room_id') || '0');
-    const guildId = parseInt(localStorage.getItem('current_guild_id') || '0');
+    useEffect(() => {
+        const loadInitialData = async () => {
+            const storedRoomId = await storeAPI.get<string>('current_room_id');
+            const storedUserId = await storeAPI.get<string>('user_id');
+            
+            if (storedUserId) {
+                setCurrentUserId(parseInt(storedUserId));
+            }
+            
+            if (storedRoomId) {
+                const id = parseInt(storedRoomId);
+                setRoomId(id);
+            }
+        };
+        
+        loadInitialData();
+    }, []);
 
     useEffect(() => {
-        const userId = localStorage.getItem('user_id');
-        if (userId) {
-            setCurrentUserId(parseInt(userId));
+        if (roomId) {
+            loadRoomInfo();
+        } else {
+            setLoading(false);
         }
-        loadRoomInfo();
-        loadRoomUsers();
     }, [roomId]);
     
     const loadRoomInfo = async () => {
@@ -69,51 +85,10 @@ export function Room_Info_Page() {
             }
         } catch (err) {
             console.error("Ошибка загрузки информации о комнате:", err);
-        }
-    };
-
-    const loadRoomUsers = async () => {
-        try {
-            const usersData = await invoke<RoomUser[]>("get_room_users", { roomId });
-            setUsers(usersData);
-        } catch (err) {
-            console.error("Ошибка загрузки пользователей комнаты:", err);
         } finally {
             setLoading(false);
         }
     };
-
-    // const handleUpdateRoom = async () => {
-    //     try {
-    //         const updatedRoom = await invoke<Room>("update_room", {
-    //             roomId,
-    //             name: editData.name,
-    //             topic: editData.topic,
-    //             bitrate: editData.bitrate,
-    //             userLimit: editData.user_limit,
-    //             userId: currentUserId
-    //         });
-    //         setRoom(updatedRoom);
-    //         setIsEditing(false);
-    //         alert("Комната успешно обновлена!");
-    //     } catch (err) {
-    //         console.error("Ошибка обновления комнаты:", err);
-    //         alert("Не удалось обновить комнату");
-    //     }
-    // };
-
-    // const handleDeleteRoom = async () => {
-    //     if (confirm("Вы уверены, что хотите удалить эту комнату?")) {
-    //         try {
-    //             await invoke("delete_room", { roomId, userId: currentUserId });
-    //             alert("Комната удалена");
-    //             navigate('/main');
-    //         } catch (err) {
-    //             console.error("Ошибка удаления комнаты:", err);
-    //             alert("Не удалось удалить комнату");
-    //         }
-    //     }
-    // };
 
     const getRoomIcon = (type: string) => {
         switch (type) {
@@ -188,47 +163,34 @@ export function Room_Info_Page() {
                             </div>
                         </div>
 
-                        <div className="room-users-section">
-                            <h3>Пользователи в комнате ({users.length})</h3>
-                            <div className="users-list">
-                                {users.map((user) => (
-                                    <div key={user.user_id} className="user-item">
-                                        <div className="user-avatar">
-                                            {user.avatar ? (
-                                                <img src={user.avatar} alt={user.username} />
-                                            ) : (
-                                                <div className="avatar-placeholder">
-                                                    {user.username[0]?.toUpperCase()}
+                        {users.length > 0 && (
+                            <div className="room-users-section">
+                                <h3>Пользователи в комнате ({users.length})</h3>
+                                <div className="users-list">
+                                    {users.map((user) => (
+                                        <div key={user.user_id} className="user-item">
+                                            <div className="user-avatar">
+                                                {user.avatar ? (
+                                                    <img src={user.avatar} alt={user.username} />
+                                                ) : (
+                                                    <div className="avatar-placeholder">
+                                                        {user.username[0]?.toUpperCase()}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="user-info">
+                                                <span className="user-name">{user.username}</span>
+                                                <div className="user-status">
+                                                    {user.is_muted && <span className="badge muted">🔇 Заглушен</span>}
+                                                    {user.is_deafened && <span className="badge deafened">🔇 Глухой</span>}
+                                                    {user.is_streaming && <span className="badge streaming">📺 Стримит</span>}
                                                 </div>
-                                            )}
-                                        </div>
-                                        <div className="user-info">
-                                            <span className="user-name">{user.username}</span>
-                                            <div className="user-status">
-                                                {user.is_muted && <span className="badge muted">🔇 Заглушен</span>}
-                                                {user.is_deafened && <span className="badge deafened">🔇 Глухой</span>}
-                                                {user.is_streaming && <span className="badge streaming">📺 Стримит</span>}
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
-                        </div>
-
-                        {/* <div className="room-actions">
-                            <button 
-                                className="edit-btn"
-                                onClick={() => setIsEditing(true)}
-                            >
-                                ✏️ Редактировать
-                            </button>
-                            <button 
-                                className="delete-btn"
-                                onClick={handleDeleteRoom}
-                            >
-                                🗑️ Удалить комнату
-                            </button>
-                        </div> */}
+                        )}
                     </>
                 ) : (
                     <div className="edit-room-form">
@@ -283,15 +245,6 @@ export function Room_Info_Page() {
                                 </div>
                             </>
                         )}
-                        
-                        {/* <div className="form-buttons">
-                            <button onClick={handleUpdateRoom} className="save-btn">
-                                💾 Сохранить
-                            </button>
-                            <button onClick={() => setIsEditing(false)} className="cancel-btn">
-                                ❌ Отмена
-                            </button>
-                        </div> */}
                     </div>
                 )}
             </div>

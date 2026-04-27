@@ -21,6 +21,7 @@ use logic::{
     send_message,
     get_user_guilds,
     get_guild_rooms,
+    get_guild_members,
     find_guild_by_id,
     join_guild_by_id,
     get_user_rooms,
@@ -42,6 +43,7 @@ use logic::{
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_store::Builder::new().build()) // Добавляем плагин хранилища
         .setup(|_app| {
             // Инициализируем базу данных в фоне
             tauri::async_runtime::spawn(async {
@@ -60,6 +62,7 @@ pub fn run() {
             send_message,
             get_user_guilds,
             get_guild_rooms,
+            get_guild_members,
             find_guild_by_id,
             join_guild_by_id,
             get_user_rooms,

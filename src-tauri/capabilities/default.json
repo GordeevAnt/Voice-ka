@@ -9,6 +9,13 @@
     "core:window:allow-minimize",
     "core:window:allow-toggle-maximize",
     "core:window:allow-close",
-    "opener:default"
+    "opener:default",
+    "store:allow-load",
+    "store:allow-save",
+    "store:allow-get",
+    "store:allow-set",
+    "store:allow-delete",
+    "store:allow-keys",
+    "store:default"
   ]
 }

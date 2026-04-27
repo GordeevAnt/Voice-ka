@@ -1,11 +1,14 @@
 // hooks/useAuth.ts
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { storeAPI } from "./useStore";
 
 interface User {
     id: number;
     username: string;
     email: string;
+    avatar?: string;
+    status: string;
 }
 
 export const useAuth = () => {
@@ -13,10 +16,10 @@ export const useAuth = () => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Получаем текущего пользователя из бэкенда
         const getCurrentUser = async () => {
             try {
-                const currentUser = await invoke<User>("get_current_user");
+                const sessionId = await storeAPI.get('session_id');
+                const currentUser = await invoke<User>("get_current_user", { sessionId });
                 setUser(currentUser);
             } catch (error) {
                 console.error("Failed to get current user:", error);

@@ -3,10 +3,7 @@ import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 import "./Register_Page.css"
-
-//
-// Cтраница регистрации
-//
+import { storeAPI } from "../features/useStore";
 
 function WrongData() {
     return <div className="wrong-active">Неверные данные</div>
@@ -44,17 +41,16 @@ export function Register_Page() {
     const handleRegister = async () => {
         try {
             const result = await invoke('register', { 
-                login: username,  // Важно: в Rust функция ожидает параметр "login"
+                login: username,
                 email, 
                 password, 
                 confirmPassword 
             });
             
-            // result возвращает кортеж [success, user_id]
             if (result && Array.isArray(result) && result[0] === true) {
                 const userId = result[1];
-                localStorage.setItem('token', "true");
-                localStorage.setItem('user_id', userId.toString());
+                await storeAPI.set('token', "true");
+                await storeAPI.set('user_id', userId.toString());
                 navigate('/main', { replace: true });
             } else {
                 setUsername("");

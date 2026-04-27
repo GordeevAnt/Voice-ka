@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, memo } from "react";
 import "./Rooms_List.css";
 import { invoke } from "@tauri-apps/api/core";
 import { Switch_Room_Button } from "../shared/Switch_Room_Button";
+import { storeAPI } from "../features/useStore";
 
 interface RoomData {
     id: number;
@@ -57,8 +58,8 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
             return;
         }
         
-        // Получаем ID текущего пользователя из localStorage
-        const userId = localStorage.getItem('user_id');
+        // Получаем ID текущего пользователя из storeAPI
+        const userId = await storeAPI.get<string>('user_id');
         if (!userId) {
             alert("Пользователь не авторизован");
             return;
@@ -131,26 +132,6 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
                     />
                 ))}
             </div>
-
-            {voiceRooms.length > 0 && (
-                <>
-                    <div className="rooms-header">
-                        <h3>Голосовые комнаты</h3>
-                    </div>
-                    <div className="rooms-list">
-                        {voiceRooms.map((room) => (
-                            <Switch_Room_Button
-                                key={room.id}
-                                roomId={room.id}
-                                name={room.name}
-                                isActive={currentRoomId === room.id}
-                                // memberCount={room.member_count}
-                                onSelect={onRoomSelect}
-                            />
-                        ))}
-                    </div>
-                </>
-            )}
             
             {/* Модальное окно создания комнаты */}
             {showCreateModal && (
@@ -166,8 +147,6 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
                         />
                         <select value={newRoomType} onChange={(e) => setNewRoomType(e.target.value)}>
                             <option value="text">Текстовая</option>
-                            <option value="voice">Голосовая</option>
-                            {/* <option value="video">Видео</option> */}
                         </select>
                         <textarea
                             placeholder="Тема (необязательно)"

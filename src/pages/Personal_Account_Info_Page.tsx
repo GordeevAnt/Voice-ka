@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
+import { storeAPI } from "../features/useStore";
 import "./Info_Pages.css";
 
 interface User {
@@ -33,6 +34,7 @@ export function Personal_Account_Info_Page() {
     const [stats, setStats] = useState<UserStats | null>(null);
     const [guilds, setGuilds] = useState<Guild[]>([]);
     const [loading, setLoading] = useState(true);
+    const [userId, setUserId] = useState<number>(0);
     const [isEditing, setIsEditing] = useState(false);
     const [editData, setEditData] = useState({
         username: "",
@@ -42,20 +44,44 @@ export function Personal_Account_Info_Page() {
         confirmPassword: ""
     });
 
-    const userId = parseInt(localStorage.getItem('user_id') || '0');
+    useEffect(() => {
+        const loadInitialData = async () => {
+            const storedUserId = await storeAPI.get<string>('user_id');
+            if (storedUserId) {
+                const parsedUserId = parseInt(storedUserId);
+                setUserId(parsedUserId);
+            }
+        };
+        loadInitialData();
+    }, []);
 
     useEffect(() => {
-        loadUserInfo();
-        loadUserStats();
-        loadUserGuilds();
-    }, []);
+        if (userId) {
+            loadUserInfo();
+            loadUserStats();
+            loadUserGuilds();
+        } else {
+            setLoading(false);
+        }
+    }, [userId]);
 
     const loadUserInfo = async () => {
         try {
-            // Используем get_current_user_simple вместо get_current_user
-            const userData = await invoke<User>("get_current_user_simple");
+            const sessionId = await storeAPI.get<string>('session_id');
+            
+            // Используем session_id для получения текущего пользователя
+            const userData = await invoke<User>("get_current_user", { 
+                sessionId: sessionId 
+            });
             setUser(userData);
-            localStorage.setItem('user_id', userData.id.toString());
+            
+            // Сохраняем актуальный user_id
+            await storeAPI.set('user_id', userData.id.toString());
+            setUserId(userData.id);
+            
+            // Также сохраняем username для fallback
+            await storeAPI.set('username', userData.username);
+            
             setEditData({
                 username: userData.username,
                 email: userData.email,
@@ -65,10 +91,27 @@ export function Personal_Account_Info_Page() {
             });
         } catch (err) {
             console.error("Ошибка загрузки информации о пользователе:", err);
+            
+            // Fallback: используем сохраненные данные
+            const storedUserId = await storeAPI.get<string>('user_id');
+            const storedUsername = await storeAPI.get<string>('username');
+            
+            if (storedUserId) {
+                setUser({
+                    id: parseInt(storedUserId),
+                    username: storedUsername || 'Пользователь',
+                    email: '',
+                    avatar: null,
+                    status: 'online'
+                });
+                setUserId(parseInt(storedUserId));
+            }
         }
     };
 
     const loadUserStats = async () => {
+        if (!userId) return;
+        
         try {
             const statsData = await invoke<UserStats>("get_user_stats", { userId });
             setStats(statsData);
@@ -78,6 +121,8 @@ export function Personal_Account_Info_Page() {
     };
 
     const loadUserGuilds = async () => {
+        if (!userId) return;
+        
         try {
             const guildsData = await invoke<Guild[]>("get_user_guilds_with_role", { userId });
             setGuilds(guildsData);
@@ -105,6 +150,10 @@ export function Personal_Account_Info_Page() {
             
             alert("Профиль успешно обновлен!");
             setIsEditing(false);
+            
+            // Обновляем сохраненное имя пользователя
+            await storeAPI.set('username', editData.username);
+            
             loadUserInfo(); // Перезагружаем данные
         } catch (err) {
             console.error("Ошибка обновления профиля:", err);
@@ -170,7 +219,7 @@ export function Personal_Account_Info_Page() {
                         <div className="user-profile-header">
                             <div className="user-avatar-large">
                                 {user.avatar ? (
-                                    <img src={user.avatar ? "./voice-ka.svg" : user.avatar}/>
+                                    <img src={user.avatar} alt={user.username} />
                                 ) : (
                                     <div className="avatar-placeholder-large">
                                         {user.username[0]?.toUpperCase()}
@@ -214,38 +263,6 @@ export function Personal_Account_Info_Page() {
                                 <span>{stats ? new Date(stats.last_seen).toLocaleString() : "Неизвестно"}</span>
                             </div>
                         </div>
-
-                        {/* <div className="user-guilds-section">
-                            <h3>Мои каналы ({guilds.length})</h3>
-                            <div className="guilds-grid">
-                                {guilds.map((guild) => (
-                                    <div key={guild.id} className="guild-card">
-                                        <div className="guild-icon">
-                                            {guild.icon ? (
-                                                <img src={guild.icon} alt={guild.name} />
-                                            ) : (
-                                                <div className="guild-icon-placeholder">
-                                                    {guild.name[0]?.toUpperCase()}
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="guild-info">
-                                            <div className="guild-name">{guild.name}</div>
-                                            <div className="guild-role">{guild.role}</div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div> */}
-
-                        {/* <div className="profile-actions">
-                            <button 
-                                className="edit-profile-btn"
-                                onClick={() => setIsEditing(true)}
-                            >
-                                ✏️ Редактировать профиль
-                            </button>
-                        </div> */}
                     </>
                 ) : (
                     <div className="edit-profile-form">

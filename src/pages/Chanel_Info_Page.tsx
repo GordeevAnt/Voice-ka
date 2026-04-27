@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
+import { storeAPI } from "../features/useStore";
 import "./Info_Pages.css";
 
 interface Guild {
@@ -26,16 +27,31 @@ export function Chanel_Info_Page() {
     const [members, setMembers] = useState<GuildMember[]>([]);
     const [loading, setLoading] = useState(true);
     const [currentUserId, setCurrentUserId] = useState<number | null>(null);
-
-    const guildId = parseInt(localStorage.getItem('current_guild_id') || '0');
+    const [guildId, setGuildId] = useState<number>(0);
 
     useEffect(() => {
-        const userId = localStorage.getItem('user_id');
-        if (userId) {
-            setCurrentUserId(parseInt(userId));
+        const loadData = async () => {
+            const storedGuildId = await storeAPI.get<string>('current_guild_id');
+            const storedUserId = await storeAPI.get<string>('user_id');
+            
+            if (storedUserId) {
+                setCurrentUserId(parseInt(storedUserId));
+            }
+            
+            if (storedGuildId) {
+                const id = parseInt(storedGuildId);
+                setGuildId(id);
+            }
+        };
+        
+        loadData();
+    }, []);
+
+    useEffect(() => {
+        if (guildId) {
+            loadGuildInfo();
+            loadGuildMembers();
         }
-        loadGuildInfo();
-        loadGuildMembers();
     }, [guildId]);
 
     const loadGuildInfo = async () => {
@@ -55,7 +71,6 @@ export function Chanel_Info_Page() {
         if (!guildId) return;
 
         try {
-            // Временно используем прямой SQL запрос через invoke
             const membersData = await invoke<GuildMember[]>("get_guild_members", { guildId });
             setMembers(membersData);
         } catch (err) {
@@ -116,7 +131,6 @@ export function Chanel_Info_Page() {
                             <span>👥 {members.length} участников</span>
                             <span>👑 Владелец: {members.find(m => m.user_id === guild.owner_id)?.username || "Неизвестен"}</span>
                         </div>
-                        
                     </div>
                 </div>
 

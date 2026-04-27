@@ -64,6 +64,7 @@ pub async fn login(login: String, password: String, ip_address: Option<String>, 
                     
                     // Создаем новую сессию с полными данными
                     let session_id = Uuid::new_v4().to_string();
+                    let connection_id = session_id.clone();
                     let now = Utc::now();
                     
                     sqlx::query(
@@ -72,8 +73,8 @@ pub async fn login(login: String, password: String, ip_address: Option<String>, 
                         VALUES ($1, $2, 'active', $3::inet, $4, $5, $5)"
                     )
                     .bind(user_id)
-                    .bind(&session_id)
-                    .bind(ip_address)  // Option<String> автоматически преобразуется в NULL или текст
+                    .bind(&connection_id)  // Сохраняем правильный connection_id
+                    .bind(ip_address)
                     .bind(user_agent)
                     .bind(now)
                     .execute(&mut *transaction)

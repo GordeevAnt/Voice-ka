@@ -25,7 +25,6 @@ pub struct UserStats {
 pub async fn get_current_user(session_id: Option<String>) -> Result<User, String> {
     let pool = get_db_pool();
     
-    // Временное решение для разработки: берем первого пользователя
     if let Some(sid) = session_id {
         let user = sqlx::query_as::<_, User>(
             r#"
@@ -35,7 +34,7 @@ pub async fn get_current_user(session_id: Option<String>) -> Result<User, String
             WHERE ws.connection_id = $1 AND ws.status = 'active'
             "#
         )
-        .bind(sid)
+        .bind(&sid)  // Используем session_id напрямую
         .fetch_optional(pool)
         .await
         .map_err(|e| format!("Ошибка получения пользователя: {}", e))?;
@@ -45,18 +44,7 @@ pub async fn get_current_user(session_id: Option<String>) -> Result<User, String
         }
     }
     
-    // Если сессия не найдена, берем первого пользователя (для разработки)
-    let user = sqlx::query_as::<_, User>(
-        "SELECT id, username, email, avatar, status FROM users LIMIT 1"
-    )
-    .fetch_optional(pool)
-    .await
-    .map_err(|e| format!("Ошибка получения пользователя: {}", e))?;
-    
-    match user {
-        Some(u) => Ok(u),
-        None => Err("Пользователь не найден".to_string()),
-    }
+    Err("Пользователь не авторизован".to_string())
 }
 
 #[command]

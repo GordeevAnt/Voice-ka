@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { storeAPI } from "../features/useStore";
 import "./Search_Chanel.css";
 
 interface GuildInfo {
@@ -11,7 +12,7 @@ interface GuildInfo {
 }
 
 interface SearchChanelProps {
-    onGuildJoined?: () => void; // Колбэк после успешного присоединения
+    onGuildJoined?: () => void;
 }
 
 export function Search_Chanel({ onGuildJoined }: SearchChanelProps) {
@@ -59,7 +60,8 @@ export function Search_Chanel({ onGuildJoined }: SearchChanelProps) {
     const handleJoin = async () => {
         if (!foundGuild) return;
 
-        const userId = localStorage.getItem('user_id');
+        // Получаем user_id из storeAPI
+        const userId = await storeAPI.get<string>('user_id');
         if (!userId) {
             setError("Пользователь не авторизован");
             return;
@@ -74,12 +76,10 @@ export function Search_Chanel({ onGuildJoined }: SearchChanelProps) {
                 guildId: foundGuild.id
             });
 
-            // Успешно присоединились
+            // Вызываем колбэк для обновления списка каналов
             onGuildJoined?.();
             handleCloseModal();
             
-            // Обновляем страницу или список каналов
-            window.location.reload();
         } catch (err) {
             setError(`Ошибка присоединения: ${err}`);
             console.error("Ошибка присоединения к каналу:", err);

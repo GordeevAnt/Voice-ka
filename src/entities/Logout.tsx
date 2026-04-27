@@ -1,43 +1,34 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useNavigate } from "react-router-dom";
-
-//
-// Кнопка выхода из аккаунта
-//
+import { storeAPI } from "../features/useStore";
 
 export function Logout() {
     const navigate = useNavigate();
     
     const handleLogout = async () => {
         try {
-            const userId = localStorage.getItem('user_id');
-            const sessionId = localStorage.getItem('session_id');
+            const userId = await storeAPI.get('user_id');
+            const sessionId = await storeAPI.get('session_id');
+            
+            console.log('Logout: User data', { userId, sessionId });
             
             if (userId) {
                 const result = await invoke('logout', { 
-                    userId: parseInt(userId),
+                    userId: parseInt(userId as string),
                     sessionId: sessionId || null
                 });
                 
                 if (result === true) {
-                    // Очищаем localStorage
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user_id');
-                    localStorage.removeItem('session_id');
-                    localStorage.removeItem('username');
-                    
-                    // Перенаправляем на страницу входа
+                    await storeAPI.clear();
                     navigate('/', { replace: true });
                 }
             } else {
-                // Если нет user_id, просто очищаем и перенаправляем
-                localStorage.clear();
+                await storeAPI.clear();
                 navigate('/', { replace: true });
             }
         } catch (error) {
             console.error("Ошибка при выходе:", error);
-            // Даже при ошибке пробуем очистить и перенаправить
-            localStorage.clear();
+            await storeAPI.clear();
             navigate('/', { replace: true });
         }
     };
