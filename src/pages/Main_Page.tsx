@@ -12,7 +12,7 @@ import { Logout } from "../entities/Logout"
 import { useState, useEffect, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
 import { storeAPI } from "../features/useStore"
-import { invoke } from "@tauri-apps/api/core"
+import { useWebSocket } from "../features/useWebsocket"
 
 export function Main_Page() {
     const navigate = useNavigate();
@@ -29,21 +29,7 @@ export function Main_Page() {
             const userId = await storeAPI.get('user_id');
             const sessionId = await storeAPI.get('session_id');
             
-            console.log('Stored data:', { token, userId, sessionId });
-            
             if (!token || !userId || !sessionId) {
-                console.log('No token or user_id, redirecting to auth');
-                navigate('/', { replace: true });
-                return;
-            }
-            
-            try {
-                const currentUser = await invoke("get_current_user", { 
-                    sessionId: sessionId 
-                });
-                console.log('Current user in Main:', currentUser);
-            } catch (error) {
-                console.error('Failed to get current user:', error);
                 navigate('/', { replace: true });
                 return;
             }
@@ -66,6 +52,17 @@ export function Main_Page() {
         loadUserData();
     }, [navigate]);
 
+    // Используем ОДИН WebSocket для всей страницы
+    const handleNewMessage = useCallback((message: any) => {
+        console.log('New message from WS:', message);
+    }, []);
+
+    const { isConnected, wsRef, lastMessage } = useWebSocket({
+        currentGuildId: currentGuildId ?? undefined,
+        currentRoomId,
+        onNewMessage: handleNewMessage,
+    });
+
     const handleGuildSelect = useCallback(async (guildId: number) => {
         setCurrentGuildId(guildId);
         await storeAPI.set('current_guild_id', guildId.toString());
@@ -76,7 +73,6 @@ export function Main_Page() {
     const handleRoomSelect = useCallback(async (roomId: number) => {
         setCurrentRoomId(roomId);
         await storeAPI.set('current_room_id', roomId.toString());
-        console.log('Выбрана комната:', roomId);
     }, []);
 
     if (isLoading) {
@@ -89,6 +85,7 @@ export function Main_Page() {
                 <div className="main-container">
                     <div className="welcome-placeholder">
                         <h2>Добро пожаловать!</h2>
+                        <p>Выберите канал слева</p>
                     </div>
                 </div>
                 <Chanels_List 
@@ -101,21 +98,29 @@ export function Main_Page() {
 
     return (
         <div className="main-page-container">
+            <div className="connection-status">
+                {!isConnected && <span className="disconnected">🔄 Переподключение...</span>}
+            </div>
             
             <div className="main-container">
-
                 {currentRoomId ? (
                     <Messenger_Field 
                         key={`messenger-${currentGuildId}-${currentRoomId}`}
                         roomId={currentRoomId} 
-                        currentUserId={currentUserId} 
+                        currentUserId={currentUserId}
+                        wsRef={wsRef}
+                        newMessage={lastMessage}
                     />
                 ) : (
-                    <div className="messenger-field"></div>
+                    <div className="messenger-field">
+                        <div className="room-selection-placeholder">
+                            <h2>Выберите комнату</h2>
+                            <p>Выберите текстовую комнату из списка справа</p>
+                        </div>
+                    </div>
                 )}
 
                 <div className="room-container">
-                    
                     <div className="settings">
                         <Info_Chanel_Button />
                         <Info_Room_Button />
@@ -135,16 +140,13 @@ export function Main_Page() {
                             onRoomSelect={handleRoomSelect}
                         />
                     </div>
-                
                 </div>
-
             </div>
 
             <Chanels_List 
                 currentGuildId={currentGuildId}
                 onGuildSelect={handleGuildSelect}
             />
-        
         </div>
     )
 }

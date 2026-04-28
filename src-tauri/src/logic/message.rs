@@ -4,6 +4,8 @@ use tauri::command;
 use chrono::{DateTime, Utc};
 use crate::db::get_db_pool;
 use crate::logic::user::get_current_user;
+use crate::ws::{SubscriptionManager, messages::WsMessage};
+use std::sync::Arc;
 
 #[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
 pub struct MessageData {
@@ -51,10 +53,14 @@ pub async fn get_room_messages(room_id: i32) -> Result<Vec<MessageData>, String>
 }
 
 #[command]
-pub async fn send_message(room_id: i32, content: String, session_id: Option<String>) -> Result<MessageData, String> {
+pub async fn send_message(
+    room_id: i32, 
+    content: String, 
+    session_id: Option<String>,
+    ws_manager: tauri::State<'_, Arc<SubscriptionManager>>
+) -> Result<MessageData, String> {
     let pool = get_db_pool();
     
-    // Получаем текущего пользователя с session_id
     let current_user = get_current_user(session_id)
         .await
         .map_err(|e| format!("Ошибка получения пользователя: {}", e))?;
@@ -84,6 +90,14 @@ pub async fn send_message(room_id: i32, content: String, session_id: Option<Stri
     .fetch_one(pool)
     .await
     .map_err(|e| format!("Ошибка отправки сообщения: {}", e))?;
+    
+    // Отправляем через WebSocket всем в комнате
+    let ws_message = WsMessage::new(
+        "new_message",
+        serde_json::to_value(&message).unwrap()
+    ).with_room(room_id);
+    
+    ws_manager.broadcast_to_room(room_id, ws_message).await;
     
     Ok(message)
 }

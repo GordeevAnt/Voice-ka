@@ -2,6 +2,9 @@
 use serde::{Serialize, Deserialize};
 use tauri::command;
 use crate::db::get_db_pool;
+use crate::ws::{SubscriptionManager, WsMessage};
+use std::sync::Arc;
+use tauri::State;
 
 #[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
 pub struct User {
@@ -243,4 +246,60 @@ pub async fn get_online_guild_members(guild_id: i32) -> Result<Vec<UserStatus>, 
     .map_err(|e| format!("Ошибка загрузки онлайн пользователей: {}", e))?;
     
     Ok(members)
+}
+
+pub async fn get_user_by_session(pool: &sqlx::PgPool, session_id: &str) -> Result<User, String> {
+    let user = sqlx::query_as::<_, User>(
+        r#"
+        SELECT u.id, u.username, u.email, u.avatar, u.status
+        FROM users u
+        INNER JOIN websocket_sessions ws ON u.id = ws.user_id
+        WHERE ws.connection_id = $1 AND ws.status = 'active'
+        "#
+    )
+    .bind(session_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| format!("Database error: {}", e))?
+    .ok_or_else(|| "User not found or session expired".to_string())?;
+    
+    Ok(user)
+}
+
+#[command]
+pub async fn notify_user_status_change(
+    user_id: i32,
+    guild_id: i32,
+    new_status: String,
+    ws_manager: State<'_, Arc<SubscriptionManager>>
+) -> Result<(), String> {
+    let pool = get_db_pool();
+    
+    // Получаем информацию о пользователе
+    let user = sqlx::query_as::<_, UserStatus>(
+        r#"
+        SELECT 
+            u.id as user_id,
+            u.username,
+            u.avatar,
+            u.status
+        FROM users u
+        WHERE u.id = $1
+        "#
+    )
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| format!("Ошибка получения пользователя: {}", e))?
+    .ok_or("Пользователь не найден")?;
+    
+    // Отправляем уведомление всем подписчикам гильдии
+    let ws_message = WsMessage::new(
+        "user_status_changed",
+        serde_json::to_value(&user).unwrap()
+    ).with_guild(guild_id);
+    
+    ws_manager.broadcast_to_guild(guild_id, ws_message).await;
+    
+    Ok(())
 }

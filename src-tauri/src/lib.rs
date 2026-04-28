@@ -1,5 +1,6 @@
 // src/lib.rs
 pub mod db;
+pub mod ws;
 
 #[path = "auth/login.rs"]
 mod login;
@@ -14,6 +15,9 @@ mod logout;
 pub use logout::logout;
 
 use db::init_database;
+use ws::{SubscriptionManager, server::start_websocket_server};
+use std::sync::Arc;
+use tauri::Manager;
 
 pub mod logic;
 use logic::{
@@ -39,20 +43,35 @@ use logic::{
     create_guild,
 };
 
-// Запуск приложения с инициализацией БД
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_store::Builder::new().build()) // Добавляем плагин хранилища
-        .setup(|_app| {
-            // Инициализируем базу данных в фоне
+        .plugin(tauri_plugin_store::Builder::new().build())
+        .setup(|app| {
+            // Инициализируем WebSocket менеджер
+            let ws_manager = Arc::new(SubscriptionManager::new());
+            
+            // Сохраняем менеджер в состоянии приложения
+            app.manage(ws_manager.clone());
+            
+            // Инициализируем базу данных
             tauri::async_runtime::spawn(async {
                 match init_database().await {
                     Ok(()) => println!("✅ База данных готова к работе"),
                     Err(e) => eprintln!("❌ Ошибка инициализации базы данных: {}", e),
                 }
             });
+            
+            // Запускаем WebSocket сервер на фиксированном порту
+            let ws_manager_clone = ws_manager.clone();
+            tauri::async_runtime::spawn(async move {
+                match start_websocket_server(ws_manager_clone, 9001).await {
+                    Ok(port) => println!("✅ WebSocket сервер запущен на порту {}", port),
+                    Err(e) => eprintln!("❌ Ошибка запуска WebSocket сервера: {}", e),
+                }
+            });
+            
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

@@ -1,6 +1,7 @@
 // widgets/Rooms_Online_List.tsx
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useWebSocket } from "../features/useWebsocket";
 import "./Rooms_Online_List.css";
 
 interface OnlineUser {
@@ -18,6 +19,28 @@ export function Rooms_Online_List({ guildId }: RoomsOnlineListProps) {
     const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
     const [loading, setLoading] = useState(true);
 
+    // Используем ОДИН WebSocket через useWebSocket
+    const { isConnected } = useWebSocket({
+        currentGuildId: guildId,
+        onUserStatusChanged: (user: OnlineUser) => {
+            setOnlineUsers(prev => {
+                if (['online', 'idle', 'dnd'].includes(user.status)) {
+                    const exists = prev.find(u => u.user_id === user.user_id);
+                    if (exists) {
+                        return prev.map(u => 
+                            u.user_id === user.user_id ? user : u
+                        );
+                    } else {
+                        return [...prev, user];
+                    }
+                } else {
+                    return prev.filter(u => u.user_id !== user.user_id);
+                }
+            });
+        }
+    });
+
+    // Загрузка начальных данных
     useEffect(() => {
         if (!guildId) {
             setOnlineUsers([]);
@@ -41,8 +64,9 @@ export function Rooms_Online_List({ guildId }: RoomsOnlineListProps) {
         };
 
         loadOnlineUsers();
-    }, [guildId]);
+    }, [guildId, isConnected]); // Обновляем при изменении статуса подключения
 
+    // Функции для аватаров
     const getInitials = (username: string) => {
         return username
             .split(' ')
@@ -81,19 +105,14 @@ export function Rooms_Online_List({ guildId }: RoomsOnlineListProps) {
 
     return (
         <div className="rooms-online-list-block">
-            <></>
             <div className="rooms-online-list">
                 {onlineUsers.length === 0 ? (
-                    <div className="no-online-users">Нет пользователей онлайн</div>
+                    <div className="no-online-users">Нет пользователей</div>
                 ) : (
                     onlineUsers.map((user) => (
                         <div key={user.user_id} className="online-user" title={user.username}>
                             {user.avatar ? (
-                                <img 
-                                    src={user.avatar} 
-                                    alt={user.username}
-                                    className="online-user-avatar"
-                                />
+                                <img src={user.avatar} alt={user.username} className="online-user-avatar" />
                             ) : (
                                 <div 
                                     className="online-user-avatar-placeholder"
@@ -102,6 +121,10 @@ export function Rooms_Online_List({ guildId }: RoomsOnlineListProps) {
                                     {getInitials(user.username)}
                                 </div>
                             )}
+                            <div className="online-user-info">
+                                <span className="online-user-name">{user.username}</span>
+                                <span className="online-user-status">{user.status}</span>
+                            </div>
                             <div className="online-user-status-dot" />
                         </div>
                     ))

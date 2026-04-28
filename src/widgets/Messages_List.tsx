@@ -4,7 +4,6 @@ import "./Messages_List.css";
 import { invoke } from "@tauri-apps/api/core";
 import { Message } from "../entities/Message";
 
-// Типы для сообщений
 interface MessageType {
     id: number;
     room_id: number;
@@ -18,131 +17,97 @@ interface MessageType {
     author_name: string;
 }
 
-// Пропсы компонента
 interface MessagesListProps {
     roomId: number;
     currentUserId?: number;
+    onNewMessage?: (message: MessageType) => void;
+    wsMessage?: any | null; // Изменяем тип на any
 }
 
-// Компонент списка сообщений
-export const Messages_List = memo(({ roomId, currentUserId }: MessagesListProps) => {
+export const Messages_List = memo(({ roomId, currentUserId, wsMessage }: MessagesListProps) => {
     const [messages, setMessages] = useState<MessageType[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [lastMessageId, setLastMessageId] = useState<number>(0);
-    const pollInterval = useRef<ReturnType<typeof setInterval>>();
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    // Функция загрузки сообщений
     const loadMessages = useCallback(async () => {
         if (!roomId) return;
+        
+        setLoading(true);
+        setError(null);
         
         try {
             const fetchedMessages = await invoke<MessageType[]>("get_room_messages", { roomId });
             setMessages(fetchedMessages);
-            
-            // Обновляем ID последнего сообщения
-            if (fetchedMessages.length > 0) {
-                const maxId = Math.max(...fetchedMessages.map(m => m.id));
-                setLastMessageId(maxId);
-            }
-            
-            setError(null);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Ошибка загрузки сообщений");
-            console.error("Failed to load messages:", err);
         } finally {
             setLoading(false);
         }
     }, [roomId]);
 
-    // Функция проверки новых сообщений (polling)
-    const checkNewMessages = useCallback(async () => {
-        if (!roomId) return;
-        
-        try {
-            // Получаем все сообщения комнаты
-            const fetchedMessages = await invoke<MessageType[]>("get_room_messages", { roomId });
-            
-            if (fetchedMessages.length > 0) {
-                const maxId = Math.max(...fetchedMessages.map(m => m.id));
-                
-                // Если есть новые сообщения, обновляем список
-                if (maxId > lastMessageId) {
-                    setMessages(fetchedMessages);
-                    setLastMessageId(maxId);
-                    // Прокручиваем вниз
-                    scrollToBottom();
-                }
-            }
-        } catch (err) {
-            console.error("Polling error:", err);
-        }
-    }, [roomId, lastMessageId]);
-
-    // Загружаем сообщения при монтировании и смене комнаты
     useEffect(() => {
-        setLoading(true);
         setMessages([]);
-        setLastMessageId(0);
         loadMessages();
     }, [loadMessages]);
 
-    // Запускаем polling при изменении roomId
+    // Добавляем новое сообщение из WebSocket
     useEffect(() => {
-        // Очищаем предыдущий интервал
-        if (pollInterval.current) {
-            clearInterval(pollInterval.current);
-        }
+        if (!wsMessage) return;
         
-        // Запускаем новый polling каждые 2 секунды
-        pollInterval.current = setInterval(checkNewMessages, 2000);
+        // Проверяем структуру сообщения
+        const messageData = wsMessage.data || wsMessage;
         
-        return () => {
-            if (pollInterval.current) {
-                clearInterval(pollInterval.current);
+        // Проверяем, что сообщение для этой комнаты
+        const messageRoomId = messageData.room_id || wsMessage.room_id;
+        if (messageRoomId !== roomId) return;
+        
+        setMessages(prev => {
+            // Проверяем, нет ли уже такого сообщения по ID
+            const messageId = messageData.id;
+            if (messageId) {
+                const exists = prev.some(msg => msg.id === messageId);
+                if (exists) return prev;
             }
-        };
-    }, [checkNewMessages, roomId]);
+            
+            // Добавляем новое сообщение
+            const newMessage: MessageType = {
+                id: messageData.id || Date.now(),
+                room_id: messageData.room_id || roomId,
+                user_id: messageData.user_id || 0,
+                content: messageData.content || '',
+                attachments: messageData.attachments || [],
+                reply_to_id: messageData.reply_to_id || null,
+                edited_at: messageData.edited_at || null,
+                deleted_at: messageData.deleted_at || null,
+                created_at: messageData.created_at || new Date().toISOString(),
+                author_name: messageData.author_name || "Unknown",
+            };
+            
+            return [...prev, newMessage];
+        });
+    }, [wsMessage, roomId]);
 
-    // Прокрутка вниз при новых сообщениях
     const scrollToBottom = () => {
-        if (messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-        }
+        setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
     };
 
-    // Прокручиваем вниз при первой загрузке
     useEffect(() => {
         if (!loading && messages.length > 0) {
             scrollToBottom();
         }
     }, [loading, messages.length]);
 
-    // Обработка новых сообщений (для внешнего использования)
-    const handleNewMessage = useCallback((newMessage: MessageType) => {
-        setMessages(prev => {
-            if (prev.some(msg => msg.id === newMessage.id)) return prev;
-            const updated = [...prev, newMessage];
-            setLastMessageId(newMessage.id);
-            return updated;
-        });
-        scrollToBottom();
-    }, []);
+    // Scroll when new message arrives
+    useEffect(() => {
+        if (wsMessage) {
+            scrollToBottom();
+        }
+    }, [wsMessage]);
 
-    // Обработка удаления сообщения
-    const handleDeleteMessage = useCallback((messageId: number) => {
-        setMessages(prev => prev.filter(msg => msg.id !== messageId));
-    }, []);
-
-    // Обработка редактирования сообщения
-    const handleEditMessage = useCallback((editedMessage: MessageType) => {
-        setMessages(prev => prev.map(msg => 
-            msg.id === editedMessage.id ? editedMessage : msg
-        ));
-    }, []);
-
-    if (loading && messages.length === 0) {
+    if (loading) {
         return (
             <div className="messages-list-block">
                 <div className="messages-loading">Загрузка сообщений...</div>
@@ -175,8 +140,6 @@ export const Messages_List = memo(({ roomId, currentUserId }: MessagesListProps)
                             text={msg.content}
                             timestamp={new Date(msg.created_at).toLocaleString()}
                             isCurrentUser={currentUserId === msg.user_id}
-                            onDelete={handleDeleteMessage}
-                            onEdit={handleEditMessage}
                         />
                     ))
                 )}

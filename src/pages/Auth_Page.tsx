@@ -1,3 +1,4 @@
+// Auth_Page.tsx - исправленная версия
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
@@ -6,11 +7,25 @@ import { storeAPI } from "../features/useStore";
 import "./Auth_Page.css"
 
 const setAuth = async (userId: number, sessionId: string) => {
-    await storeAPI.set('token', "true");
-    await storeAPI.set('user_id', userId.toString());
-    await storeAPI.set('session_id', sessionId);
-    
-    console.log('Auth data saved:', { userId, sessionId });
+    try {
+        await storeAPI.set('token', "true");
+        await storeAPI.set('user_id', userId.toString());
+        await storeAPI.set('session_id', sessionId);
+        
+        // Проверяем, что данные сохранились
+        const savedToken = await storeAPI.get('token');
+        const savedUserId = await storeAPI.get('user_id');
+        const savedSessionId = await storeAPI.get('session_id');
+        
+        console.log('Auth data saved successfully:', { 
+            userId: savedUserId, 
+            sessionId: savedSessionId,
+            token: savedToken 
+        });
+    } catch (error) {
+        console.error('Failed to save auth data:', error);
+        throw error;
+    }
 }
 
 function WrongData() {
@@ -27,14 +42,21 @@ export function Auth_Page() {
     // Проверяем, не авторизован ли уже пользователь
     useEffect(() => {
         const checkAuth = async () => {
-            const token = await storeAPI.get('token');
-            const userId = await storeAPI.get('user_id');
-            
-            if (token && userId) {
-                console.log('User already authenticated, redirecting...');
-                navigate('/main', { replace: true });
+            try {
+                const token = await storeAPI.get('token');
+                const userId = await storeAPI.get('user_id');
+                
+                console.log('Checking existing auth:', { token, userId });
+                
+                if (token && userId) {
+                    console.log('User already authenticated, redirecting...');
+                    navigate('/main', { replace: true });
+                }
+            } catch (error) {
+                console.error('Error checking auth:', error);
+            } finally {
+                setIsCheckingAuth(false);
             }
-            setIsCheckingAuth(false);
         };
         checkAuth();
     }, [navigate]);
@@ -49,40 +71,41 @@ export function Auth_Page() {
     
     const handleLogin = async () => {
         try {
-            console.log('Attempting login with:', loginValue);
-            const result = await invoke("login", { login: loginValue, password: passwordValue });
+            setWrong(0);
+            console.log('🔑 Attempting login with:', loginValue);
             
-            console.log('Login result:', result);
+            const result = await invoke("login", { 
+                login: loginValue, 
+                password: passwordValue,
+                ipAddress: null,
+                userAgent: navigator.userAgent
+            });
             
-            if (result && Array.isArray(result) && result[0] === true) {
-                const success = result[0];
-                const userId = result[1];
-                const sessionId = result[2];
+            console.log('📥 Raw result:', result);
+            console.log('📥 Result type:', typeof result);
+            
+            // Tauri возвращает кортеж как массив
+            if (Array.isArray(result) && result.length >= 3) {
+                const [success, userId, sessionId] = result;
                 
-                console.log('Saving session:', { userId, sessionId }); // Добавьте это
+                console.log('📊 Parsed result:', { success, userId, sessionId });
                 
-                if (success) {
+                if (success === true && userId > 0 && sessionId) {
+                    console.log('✅ Login successful, saving auth data...');
                     await setAuth(userId, sessionId);
-                    
-                    // Проверяем, что данные сохранились
-                    const verifyUserId = await storeAPI.get('user_id');
-                    const verifySessionId = await storeAPI.get('session_id');
-                    console.log('Verification - stored:', { 
-                        user_id: verifyUserId, 
-                        session_id: verifySessionId 
-                    });
-                    
-                    // Проверяем текущего пользователя
-                    const currentUser = await invoke("get_current_user", { 
-                        sessionId: verifySessionId 
-                    });
-                    console.log('Current user:', currentUser);
-                    
+                    console.log('🚀 Redirecting to main page...');
                     navigate('/main', { replace: true });
+                } else {
+                    console.log('❌ Login failed: invalid credentials');
+                    setWrong(1);
                 }
+            } else {
+                console.error('❌ Unexpected result format:', result);
+                setWrong(1);
             }
         } catch (error) {
-            console.error("Ошибка входа:", error);
+            console.error("❌ Login error:", error);
+            setWrong(1);
         }
     };
 

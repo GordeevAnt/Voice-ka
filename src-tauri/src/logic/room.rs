@@ -3,6 +3,9 @@ use serde::{Deserialize, Serialize};
 use tauri::command;
 use chrono::{DateTime, Utc};
 use crate::db::get_db_pool;
+use crate::ws::{SubscriptionManager, messages::WsMessage}; // ДОБАВИТЬ
+use std::sync::Arc; // ДОБАВИТЬ
+use tauri::State; // ДОБАВИТЬ
 
 #[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
 pub struct RoomData {
@@ -143,7 +146,10 @@ pub async fn get_room_by_id(room_id: i32) -> Result<Option<RoomData>, String> {
 }
 
 #[command]
-pub async fn create_room(room_data: CreateRoomData) -> Result<RoomData, String> {
+pub async fn create_room(
+    room_data: CreateRoomData,
+    ws_manager: State<'_, Arc<SubscriptionManager>> // ДОБАВИТЬ параметр
+) -> Result<RoomData, String> {
     let pool = get_db_pool();
     
     // Проверяем, является ли пользователь участником гильдии
@@ -221,6 +227,14 @@ pub async fn create_room(room_data: CreateRoomData) -> Result<RoomData, String> 
     .fetch_one(pool)
     .await
     .map_err(|e| format!("Ошибка получения данных комнаты: {}", e))?;
+    
+    // Отправляем уведомление через WebSocket всем в гильдии
+    let ws_message = WsMessage::new(
+        "room_created",
+        serde_json::to_value(&room_with_count).unwrap_or_default()
+    ).with_guild(room_data.guild_id);
+    
+    ws_manager.broadcast_to_guild(room_data.guild_id, ws_message).await;
     
     Ok(room_with_count)
 }

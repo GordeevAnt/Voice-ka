@@ -4,6 +4,7 @@ import "./Rooms_List.css";
 import { invoke } from "@tauri-apps/api/core";
 import { Switch_Room_Button } from "../shared/Switch_Room_Button";
 import { storeAPI } from "../features/useStore";
+import { useWebSocket } from "./useWebsocket";
 
 interface RoomData {
     id: number;
@@ -31,6 +32,21 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
     const [newRoomType, setNewRoomType] = useState("text");
     const [newRoomTopic, setNewRoomTopic] = useState("");
 
+    const { lastMessage } = useWebSocket({
+        currentGuildId: guildId,
+    });
+
+    useEffect(() => {
+        if (lastMessage?.type === 'room_created' && lastMessage?.guild_id === guildId) {
+            const newRoom = lastMessage.data;
+            setRooms(prev => {
+                const exists = prev.some(r => r.id === newRoom.id);
+                if (exists) return prev;
+                return [...prev, newRoom];
+            });
+        }
+    }, [lastMessage, guildId]);
+
     const loadRooms = useCallback(async () => {
         if (!guildId) return;
         
@@ -51,6 +67,18 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
     useEffect(() => {
         loadRooms();
     }, [loadRooms]);
+
+    useWebSocket({
+        currentGuildId: guildId,
+        onRoomCreated: (room: RoomData) => {
+            setRooms(prev => {
+                // Проверяем, нет ли уже такой комнаты
+                const exists = prev.some(r => r.id === room.id);
+                if (exists) return prev;
+                return [...prev, room];
+            });
+        }
+    });
 
     const handleCreateRoom = useCallback(async () => {
         if (!newRoomName.trim()) {
