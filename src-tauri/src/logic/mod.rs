@@ -35,4 +35,5 @@ pub use user::{
     get_user_stats,
     update_user_profile,
     get_user_guilds_with_role,
+    notify_user_status_change,
 };

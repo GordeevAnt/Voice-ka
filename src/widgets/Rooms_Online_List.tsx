@@ -1,5 +1,5 @@
 // widgets/Rooms_Online_List.tsx
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useWebSocket } from "../features/useWebsocket";
 import "./Rooms_Online_List.css";
@@ -19,25 +19,32 @@ export function Rooms_Online_List({ guildId }: RoomsOnlineListProps) {
     const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Используем ОДИН WebSocket через useWebSocket
+    // Обработчик изменения статуса пользователя
+    const handleUserStatusChanged = useCallback((user: OnlineUser) => {
+        console.log('🔄 User status changed:', user);
+        setOnlineUsers(prev => {
+            if (['online', 'idle', 'dnd'].includes(user.status)) {
+                const exists = prev.find(u => u.user_id === user.user_id);
+                if (exists) {
+                    // Обновляем существующего пользователя
+                    return prev.map(u => 
+                        u.user_id === user.user_id ? user : u
+                    );
+                } else {
+                    // Добавляем нового онлайн пользователя
+                    return [...prev, user];
+                }
+            } else {
+                // Удаляем оффлайн пользователя
+                return prev.filter(u => u.user_id !== user.user_id);
+            }
+        });
+    }, []);
+
+    // Используем WebSocket хук с обработчиками
     const { isConnected } = useWebSocket({
         currentGuildId: guildId,
-        onUserStatusChanged: (user: OnlineUser) => {
-            setOnlineUsers(prev => {
-                if (['online', 'idle', 'dnd'].includes(user.status)) {
-                    const exists = prev.find(u => u.user_id === user.user_id);
-                    if (exists) {
-                        return prev.map(u => 
-                            u.user_id === user.user_id ? user : u
-                        );
-                    } else {
-                        return [...prev, user];
-                    }
-                } else {
-                    return prev.filter(u => u.user_id !== user.user_id);
-                }
-            });
-        }
+        onUserStatusChanged: handleUserStatusChanged,
     });
 
     // Загрузка начальных данных
@@ -54,6 +61,7 @@ export function Rooms_Online_List({ guildId }: RoomsOnlineListProps) {
                 const users = await invoke<OnlineUser[]>("get_online_guild_members", { 
                     guildId: guildId
                 });
+                console.log('📋 Loaded online users:', users);
                 setOnlineUsers(users);
             } catch (error) {
                 console.error("Ошибка загрузки онлайн пользователей:", error);

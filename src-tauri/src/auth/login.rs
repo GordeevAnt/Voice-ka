@@ -117,10 +117,32 @@ pub async fn login(
                         .await
                         .map_err(|e| format!("Ошибка сохранения данных: {}", e))?;
                     
-                    println!("✅ Пользователь {} (ID: {}) успешно вошел в систему", login, user_id);
-                    println!("📝 Session ID: {}", session_id);
-                    
-                    // Возвращаем успешный результат
+                    let user_guilds: Vec<i32> = sqlx::query_scalar(
+                        "SELECT guild_id FROM guild_members WHERE user_id = $1"
+                    )
+                    .bind(user_id)
+                    .fetch_all(pool)
+                    .await
+                    .unwrap_or_default();
+
+                    // Отправляем уведомление о входе пользователя во все его гильдии
+                    let user_status = serde_json::json!({
+                        "user_id": user_id,
+                        "username": login,
+                        "avatar": serde_json::Value::Null,
+                        "status": "online"
+                    });
+
+                    let ws_message = WsMessage::new(
+                        "user_status_changed",
+                        user_status
+                    );
+
+                    for guild_id in user_guilds {
+                        ws_manager.broadcast_to_guild(guild_id, ws_message.clone()).await;
+                    }
+
+                    println!("Пользователь {} (ID: {}) успешно вошел в систему", login, user_id);
                     Ok((true, user_id, session_id))
                 },
                 Err(_) => {

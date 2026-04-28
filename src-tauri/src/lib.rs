@@ -41,6 +41,7 @@ use logic::{
     update_user_profile,
     get_user_guilds_with_role,
     create_guild,
+    notify_user_status_change,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -98,6 +99,7 @@ pub fn run() {
             update_user_profile,
             get_user_guilds_with_role,
             create_guild,
+            notify_user_status_change,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

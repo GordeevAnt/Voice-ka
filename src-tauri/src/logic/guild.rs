@@ -1,9 +1,11 @@
 // src-tauri/src/logic/guild.rs
 
+use std::sync::Arc;
+
 use chrono::{DateTime, Utc};
 use serde::{Serialize, Deserialize};
-use tauri::command;
-use crate::db::get_db_pool;
+use tauri::{State, command};
+use crate::{db::get_db_pool, ws::{SubscriptionManager, WsMessage}};
 
 /// Структура канала (гильдии) для передачи на фронтенд
 #[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
@@ -75,7 +77,11 @@ pub async fn find_guild_by_id(guild_id: i32) -> Result<Option<Guild>, String> {
 
 /// Присоединение к каналу по ID
 #[command]
-pub async fn join_guild_by_id(user_id: i32, guild_id: i32) -> Result<bool, String> {
+pub async fn join_guild_by_id(
+    user_id: i32, 
+    guild_id: i32,
+    ws_manager: State<'_, Arc<SubscriptionManager>>  // Добавьте этот параметр
+) -> Result<bool, String> {
     let pool = get_db_pool();
     
     // Проверяем, существует ли канал
@@ -121,6 +127,30 @@ pub async fn join_guild_by_id(user_id: i32, guild_id: i32) -> Result<bool, Strin
     .execute(pool)
     .await
     .map_err(|e| format!("Ошибка присоединения к каналу: {}", e))?;
+    
+    // Отправляем уведомление о новом участнике
+    let user = sqlx::query_as::<_, (String, Option<String>, String)>(
+        "SELECT username, avatar, status FROM users WHERE id = $1"
+    )
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| format!("Ошибка получения данных пользователя: {}", e))?
+    .ok_or("Пользователь не найден")?;
+    
+    let user_status = serde_json::json!({
+        "user_id": user_id,
+        "username": user.0,
+        "avatar": user.1,
+        "status": user.2
+    });
+    
+    let ws_message = WsMessage::new(
+        "user_status_changed",
+        user_status
+    ).with_guild(guild_id);
+    
+    ws_manager.broadcast_to_guild(guild_id, ws_message).await;
     
     Ok(true)
 }

@@ -32,20 +32,21 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
     const [newRoomType, setNewRoomType] = useState("text");
     const [newRoomTopic, setNewRoomTopic] = useState("");
 
-    const { lastMessage } = useWebSocket({
-        currentGuildId: guildId,
-    });
+    // Обработчик создания новой комнаты через WebSocket
+    const handleRoomCreated = useCallback((room: RoomData) => {
+        console.log('🆕 Room created via WS:', room);
+        setRooms(prev => {
+            const exists = prev.some(r => r.id === room.id);
+            if (exists) return prev;
+            return [...prev, room];
+        });
+    }, []);
 
-    useEffect(() => {
-        if (lastMessage?.type === 'room_created' && lastMessage?.guild_id === guildId) {
-            const newRoom = lastMessage.data;
-            setRooms(prev => {
-                const exists = prev.some(r => r.id === newRoom.id);
-                if (exists) return prev;
-                return [...prev, newRoom];
-            });
-        }
-    }, [lastMessage, guildId]);
+    // Используем WebSocket для получения уведомлений о новых комнатах
+    useWebSocket({
+        currentGuildId: guildId,
+        onRoomCreated: handleRoomCreated,
+    });
 
     const loadRooms = useCallback(async () => {
         if (!guildId) return;
@@ -55,6 +56,7 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
         
         try {
             const guildRooms = await invoke<RoomData[]>("get_guild_rooms", { guildId });
+            console.log('📋 Loaded rooms:', guildRooms);
             setRooms(guildRooms);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Ошибка загрузки комнат");
@@ -67,18 +69,6 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
     useEffect(() => {
         loadRooms();
     }, [loadRooms]);
-
-    useWebSocket({
-        currentGuildId: guildId,
-        onRoomCreated: (room: RoomData) => {
-            setRooms(prev => {
-                // Проверяем, нет ли уже такой комнаты
-                const exists = prev.some(r => r.id === room.id);
-                if (exists) return prev;
-                return [...prev, room];
-            });
-        }
-    });
 
     const handleCreateRoom = useCallback(async () => {
         if (!newRoomName.trim()) {
@@ -93,6 +83,7 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
         }
         
         try {
+            // Комната будет добавлена через WebSocket, но также получаем её здесь для немедленного отображения
             const newRoom = await invoke<RoomData>("create_room", {
                 roomData: {
                     name: newRoomName.trim(),
@@ -105,7 +96,13 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
                 }
             });
             
-            setRooms(prev => [...prev, newRoom]);
+            // WebSocket обновит список автоматически, но для мгновенного отклика добавляем сразу
+            setRooms(prev => {
+                const exists = prev.some(r => r.id === newRoom.id);
+                if (exists) return prev;
+                return [...prev, newRoom];
+            });
+            
             setShowCreateModal(false);
             setNewRoomName("");
             setNewRoomTopic("");
@@ -137,7 +134,6 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
     }
 
     const textRooms = rooms.filter(r => r.room_type === 'text');
-    const voiceRooms = rooms.filter(r => r.room_type === 'voice');
 
     return (
         <div className="rooms-list-block">

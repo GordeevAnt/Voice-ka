@@ -148,7 +148,7 @@ pub async fn get_room_by_id(room_id: i32) -> Result<Option<RoomData>, String> {
 #[command]
 pub async fn create_room(
     room_data: CreateRoomData,
-    ws_manager: State<'_, Arc<SubscriptionManager>> // ДОБАВИТЬ параметр
+    ws_manager: State<'_, Arc<SubscriptionManager>>
 ) -> Result<RoomData, String> {
     let pool = get_db_pool();
     
@@ -234,6 +234,7 @@ pub async fn create_room(
         serde_json::to_value(&room_with_count).unwrap_or_default()
     ).with_guild(room_data.guild_id);
     
+    // Отправляем broadcast всем подписчикам гильдии
     ws_manager.broadcast_to_guild(room_data.guild_id, ws_message).await;
     
     Ok(room_with_count)
