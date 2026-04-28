@@ -14,8 +14,8 @@ export function Switch_Chanel_Button({
     onSelect 
 }: SwitchChanelButtonProps) {
     const handleClick = () => {
+        console.log(`🔄 Switch_Chanel_Button clicked: switching to guild ${guildId}`);
         onSelect(guildId);
-        console.log(guildId.toString())
     };
 
     return (

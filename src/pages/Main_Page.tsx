@@ -9,7 +9,7 @@ import { Rooms_List } from "../features/Rooms_List"
 import "./Main_Page.css"
 import { Chanels_List } from "../features/Chanels_List"
 import { Logout } from "../entities/Logout"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { storeAPI } from "../features/useStore"
 import { useWebSocket } from "../features/useWebsocket"
@@ -20,6 +20,9 @@ export function Main_Page() {
     const [currentGuildId, setCurrentGuildId] = useState<number | null>(null);
     const [currentRoomId, setCurrentRoomId] = useState<number | undefined>(undefined);
     const [currentUserId, setCurrentUserId] = useState<number>(1);
+    
+    // Ref для отслеживания предыдущей гильдии
+    const previousGuildIdRef = useRef<number | null>(null);
 
     useEffect(() => {
         const loadUserData = async () => {
@@ -38,7 +41,9 @@ export function Main_Page() {
             
             const savedGuildId = await storeAPI.get('current_guild_id');
             if (savedGuildId) {
-                setCurrentGuildId(parseInt(savedGuildId as string));
+                const guildId = parseInt(savedGuildId as string);
+                setCurrentGuildId(guildId);
+                previousGuildIdRef.current = guildId;
             }
             
             const savedRoomId = await storeAPI.get('current_room_id');
@@ -57,13 +62,36 @@ export function Main_Page() {
         console.log('New message from WS:', message);
     }, []);
 
-    const { isConnected, wsRef, lastMessage } = useWebSocket({
+    // ВСЕГДА передаем currentGuildId в useWebSocket, даже если он null
+    const { isConnected, wsRef, lastMessage, subscribeToGuild, unsubscribeFromGuild } = useWebSocket({
         currentGuildId: currentGuildId ?? undefined,
         currentRoomId,
         onNewMessage: handleNewMessage,
     });
 
+    // Подписка на новую гильдию при её смене
+    useEffect(() => {
+        if (!currentGuildId) return;
+        
+        console.log(`🔄 Guild changed from ${previousGuildIdRef.current} to ${currentGuildId}`);
+        
+        // Отписываемся от предыдущей гильдии
+        if (previousGuildIdRef.current && previousGuildIdRef.current !== currentGuildId) {
+            console.log(`📤 Unsubscribing from guild: ${previousGuildIdRef.current}`);
+            unsubscribeFromGuild(previousGuildIdRef.current);
+        }
+        
+        // Подписываемся на новую гильдию
+        console.log(`📥 Subscribing to guild: ${currentGuildId}`);
+        subscribeToGuild(currentGuildId);
+        
+        // Обновляем ref
+        previousGuildIdRef.current = currentGuildId;
+        
+    }, [currentGuildId, subscribeToGuild, unsubscribeFromGuild]);
+
     const handleGuildSelect = useCallback(async (guildId: number) => {
+        console.log(`🔄 Switching to guild: ${guildId}`);
         setCurrentGuildId(guildId);
         await storeAPI.set('current_guild_id', guildId.toString());
         setCurrentRoomId(undefined);

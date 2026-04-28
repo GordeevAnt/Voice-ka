@@ -56,6 +56,7 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
                 userId: parseInt(userId) 
             });
             
+            console.log('📋 Loaded guilds:', guildsData);
             setGuilds(guildsData);
         } catch (err) {
             console.error("Ошибка загрузки каналов:", err);
@@ -74,6 +75,7 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
     };
 
     const handleGuildSelect = (guildId: number) => {
+        console.log(`🔄 Chanels_List: guild selected: ${guildId}`);
         onGuildSelect(guildId);
     };
 
@@ -110,6 +112,7 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
             
             // Автоматически выбираем новую гильдию
             if (newGuild && newGuild.id) {
+                console.log(`🆕 New guild created, switching to: ${newGuild.id}`);
                 onGuildSelect(newGuild.id);
             }
         } catch (err) {

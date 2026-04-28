@@ -1,14 +1,40 @@
+// logout.rs - с WebSocket уведомлениями
 use sqlx::postgres::PgPoolOptions;
 use chrono::Utc;
 use serde_json::json;
+use crate::ws::{SubscriptionManager, WsMessage};
+use std::sync::Arc;
+use tauri::State;
 
 #[tauri::command]
-pub async fn logout(user_id: i32, session_id: Option<String>) -> Result<bool, String> {
+pub async fn logout(
+    user_id: i32, 
+    session_id: Option<String>,
+    ws_manager: State<'_, Arc<SubscriptionManager>>
+) -> Result<bool, String> {
     let pool = PgPoolOptions::new()
         .max_connections(5)
         .connect("postgresql://gbilly_sysadmin:BillyJinn228@localhost:5433/Voice-ka_Local")
         .await
         .map_err(|e| e.to_string())?;
+    
+    // Получаем гильдии пользователя ДО выхода для отправки уведомлений
+    let user_guilds: Vec<i32> = sqlx::query_scalar(
+        "SELECT guild_id FROM guild_members WHERE user_id = $1"
+    )
+    .bind(user_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap_or_default();
+    
+    // Получаем данные пользователя для уведомления
+    let user_data = sqlx::query_as::<_, (String, Option<String>)>(
+        "SELECT username, avatar FROM users WHERE id = $1"
+    )
+    .bind(user_id)
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| e.to_string())?;
     
     // Начинаем транзакцию для атомарности операций
     let mut transaction = pool
@@ -55,38 +81,7 @@ pub async fn logout(user_id: i32, session_id: Option<String>) -> Result<bool, St
     .await
     .map_err(|e| format!("Ошибка проверки активных сессий: {}", e))?;
     
-    // 3. Если есть активная голосовая сессия - закрываем её и создаем лог
-    let voice_session = sqlx::query_as::<_, (i32, uuid::Uuid, chrono::DateTime<Utc>)>(
-        "UPDATE voice_states 
-        SET left_at = $1
-        WHERE user_id = $2 AND left_at IS NULL
-        RETURNING room_id, session_id, joined_at"
-    )
-    .bind(Utc::now())
-    .bind(user_id)
-    .fetch_optional(&mut *transaction)
-    .await
-    .map_err(|e| format!("Ошибка обновления голосового состояния: {}", e))?;
-    
-    // Создаем запись в voice_activity_logs, если была активная голосовая сессия
-    if let Some((room_id, session_uuid, joined_at)) = voice_session {
-        sqlx::query(
-            "INSERT INTO voice_activity_logs 
-            (user_id, room_id, session_id, joined_at, left_at, packets_sent, packets_lost, created_at)
-            VALUES ($1, $2, $3, $4, $5, 0, 0, $6)"
-        )
-        .bind(user_id)
-        .bind(room_id)
-        .bind(session_uuid)
-        .bind(joined_at)
-        .bind(Utc::now())
-        .bind(Utc::now())
-        .execute(&mut *transaction)
-        .await
-        .map_err(|e| format!("Ошибка создания лога голосовой активности: {}", e))?;
-    }
-    
-    // 4. Обновляем статус пользователя только если нет других активных сессий
+    // 3. Обновляем статус пользователя только если нет других активных сессий
     if active_sessions == 0 {
         sqlx::query(
             "UPDATE users 
@@ -106,36 +101,34 @@ pub async fn logout(user_id: i32, session_id: Option<String>) -> Result<bool, St
         println!("Пользователь с ID {} остался online (активных сессий: {})", user_id, active_sessions);
     }
     
-    // Получаем личный сервер пользователя
-    let user_guild_id: Option<i32> = sqlx::query_scalar(
-        "SELECT id FROM guilds WHERE owner_id = $1 LIMIT 1"
-    )
-    .bind(user_id)
-    .fetch_optional(&mut *transaction)
-    .await
-    .map_err(|e| format!("Ошибка получения сервера пользователя: {}", e))?;
-
-    let guild_id = user_guild_id.ok_or_else(|| "Не найден сервер пользователя".to_string())?;
-
-    // Аудит-лог
-    sqlx::query(
-        "INSERT INTO audit_logs (guild_id, user_id, action_type, target_id, changes, created_at)
-        VALUES ($1, $2, 'USER_LOGOUT', $3, $4::jsonb, $5)"
-    )
-    .bind(guild_id)
-    .bind(user_id)
-    .bind(user_id)
-    .bind(json!({"session_id": session_id, "active_sessions_remaining": active_sessions}).to_string())
-    .bind(Utc::now())
-    .execute(&mut *transaction)
-    .await
-    .map_err(|e| format!("Ошибка создания аудит-лога: {}", e))?;
-    
     // Фиксируем транзакцию
     transaction
         .commit()
         .await
         .map_err(|e| format!("Ошибка сохранения изменений: {}", e))?;
+    
+    // Отправляем уведомление о выходе пользователя во все его гильдии
+    if active_sessions == 0 {
+        if let Some((username, avatar)) = user_data {
+            let user_status = json!({
+                "user_id": user_id,
+                "username": username,
+                "avatar": avatar,
+                "status": "offline"
+            });
+            
+            let ws_message = WsMessage::new(
+                "user_status_changed",
+                user_status
+            );
+            
+            // Отправляем уведомление во все гильдии пользователя
+            for guild_id in &user_guilds {
+                println!("📤 Отправка уведомления о выходе в гильдию {}", guild_id);
+                ws_manager.broadcast_to_guild(*guild_id, ws_message.clone()).await;
+            }
+        }
+    }
     
     println!("Пользователь с ID {} успешно выполнил выход из системы", user_id);
     
