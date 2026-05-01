@@ -599,7 +599,36 @@ pub async fn init_database() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Получить глобальный пул соединений
-pub fn get_db_pool() -> &'static PgPool {
-    DB_POOL.get().expect("База данных не инициализирована")
+pub async fn connect_database() -> Result<(), Box<dyn std::error::Error>> {
+    if DB_POOL.get().is_some() {
+        return Ok(()); // уже подключены
+    }
+    
+    let _ = dotenvy::from_filename("../.env");
+    let _ = dotenvy::dotenv();
+    
+    let database_url = std::env::var("DATABASE_URL")
+        .expect("DATABASE_URL не установлена в .env файле");
+    
+    println!("🔌 Подключение к базе данных...");
+    
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&database_url)
+        .await?;
+    
+    println!("✅ База данных подключена");
+    
+    DB_POOL.set(pool).unwrap();
+    Ok(())
+}
+
+// Возвращаем Option вместо паники
+pub fn get_db_pool() -> Option<&'static PgPool> {
+    DB_POOL.get()
+}
+
+// Для удобства - вызывает панику, если БД не подключена
+pub fn get_db_pool_unchecked() -> &'static PgPool {
+    DB_POOL.get().expect("База данных не подключена. Вызовите connect_database() сначала")
 }

@@ -26,11 +26,8 @@ pub async fn register(login: String, email: String, password: String, confirm_pa
         return Err("Некорректный email".to_string());
     }
     
-    let pool = PgPoolOptions::new()
-        .max_connections(5)
-        .connect("postgresql://gbilly_sysadmin:BillyJinn228@localhost:5433/Voice-ka_Local")
-        .await
-        .map_err(|e| e.to_string())?;
+    let pool = crate::db::get_db_pool()
+        .ok_or("База данных не подключена")?;
     
     // Проверка существования пользователя
     let existing_user: Option<(String, String)> = sqlx::query_as(
@@ -38,7 +35,7 @@ pub async fn register(login: String, email: String, password: String, confirm_pa
     )
     .bind(&login)
     .bind(&email)
-    .fetch_optional(&pool)
+    .fetch_optional(pool)
     .await
     .map_err(|e| e.to_string())?;
     
@@ -65,7 +62,7 @@ pub async fn register(login: String, email: String, password: String, confirm_pa
         .await
         .map_err(|e| format!("Ошибка начала транзакции: {}", e))?;
     
-    // Создаем пользователя (статус 'offline' до первого входа)
+    // Создаем пользователя
     let user_id: i32 = sqlx::query_scalar(
         "INSERT INTO users (username, email, password_hash, status, created_at, updated_at) 
         VALUES ($1, $2, $3, 'offline', $4, $4)

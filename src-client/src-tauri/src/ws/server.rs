@@ -129,13 +129,24 @@ pub async fn start_websocket_server(
                                                                 .unwrap_or("");
                                                             
                                                             // Сохраняем сообщение в БД и отправляем всем
-                                                            let pool = get_db_pool();
+                                                            let pool = match get_db_pool() {
+                                                                Some(p) => p,
+                                                                None => {
+                                                                    eprintln!("База данных не подключена");
+                                                                    let error_msg = serde_json::json!({
+                                                                        "type": "error",
+                                                                        "data": { "message": "База данных не доступна" }
+                                                                    });
+                                                                    let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(error_msg.to_string()));
+                                                                    continue;
+                                                                }
+                                                            };
                                                             
                                                             // Получаем user_id по session_id
                                                             let user_result = sqlx::query!(
                                                                 "SELECT u.id, u.username FROM users u \
-                                                                 INNER JOIN websocket_sessions ws ON u.id = ws.user_id \
-                                                                 WHERE ws.connection_id = $1 AND ws.status = 'active'",
+                                                                INNER JOIN websocket_sessions ws ON u.id = ws.user_id \
+                                                                WHERE ws.connection_id = $1 AND ws.status = 'active'",
                                                                 session_id
                                                             )
                                                             .fetch_optional(pool)
@@ -145,8 +156,8 @@ pub async fn start_websocket_server(
                                                                 // Вставляем сообщение в БД
                                                                 let msg_result = sqlx::query!(
                                                                     "INSERT INTO messages (room_id, user_id, content, attachments) \
-                                                                     VALUES ($1, $2, $3, '[]'::jsonb) \
-                                                                     RETURNING id, room_id, user_id, content, created_at",
+                                                                    VALUES ($1, $2, $3, '[]'::jsonb) \
+                                                                    RETURNING id, room_id, user_id, content, created_at",
                                                                     room_id as i32,
                                                                     user.id,
                                                                     content

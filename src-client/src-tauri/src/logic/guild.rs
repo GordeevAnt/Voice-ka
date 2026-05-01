@@ -26,7 +26,7 @@ struct ExistsResult {
 /// Получение всех каналов (гильдий), в которых состоит пользователь
 #[command]
 pub async fn get_user_guilds(user_id: i32) -> Result<Vec<Guild>, String> {
-    let pool = get_db_pool();
+    let pool = get_db_pool().ok_or("База данных не подключена")?;
     
     let guilds = sqlx::query_as::<_, Guild>(
         r#"
@@ -53,7 +53,7 @@ pub async fn get_user_guilds(user_id: i32) -> Result<Vec<Guild>, String> {
 /// Поиск канала по ID
 #[command]
 pub async fn find_guild_by_id(guild_id: i32) -> Result<Option<Guild>, String> {
-    let pool = get_db_pool();
+    let pool = get_db_pool().ok_or("База данных не подключена")?;
     
     let guild = sqlx::query_as::<_, Guild>(
         r#"
@@ -82,7 +82,7 @@ pub async fn join_guild_by_id(
     guild_id: i32,
     ws_manager: State<'_, Arc<SubscriptionManager>>  // Добавьте этот параметр
 ) -> Result<bool, String> {
-    let pool = get_db_pool();
+    let pool = get_db_pool().ok_or("База данных не подключена")?;
     
     // Проверяем, существует ли канал
     let guild_exists = sqlx::query_as::<_, ExistsResult>(
@@ -167,7 +167,7 @@ pub struct CreateGuildData {
 /// Создание новой гильдии (канала)
 #[command]
 pub async fn create_guild(guild_data: CreateGuildData) -> Result<Guild, String> {
-    let pool = get_db_pool();
+    let pool = get_db_pool().ok_or("База данных не подключена")?;
     
     // Проверяем, существует ли пользователь
     let user_exists = sqlx::query_as::<_, ExistsResult>(
@@ -292,7 +292,7 @@ pub struct GuildMember {
 
 #[command]
 pub async fn get_guild_members(guild_id: i32) -> Result<Vec<GuildMember>, String> {
-    let pool = get_db_pool();
+    let pool = get_db_pool().ok_or("База данных не подключена")?;
     
     let members = sqlx::query_as::<_, GuildMember>(
         r#"

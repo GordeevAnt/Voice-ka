@@ -19,7 +19,8 @@ pub async fn login(
     user_agent: Option<String>,
     ws_manager: State<'_, Arc<SubscriptionManager>>
 ) -> Result<(bool, i32, String), String> {
-    let pool = get_db_pool();
+    let pool = crate::db::get_db_pool()
+        .ok_or("База данных не подключена")?;
     
     // Получаем данные пользователя
     let user: Option<(i32, String)> = sqlx::query_as(

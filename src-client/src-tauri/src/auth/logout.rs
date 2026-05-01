@@ -12,31 +12,28 @@ pub async fn logout(
     session_id: Option<String>,
     ws_manager: State<'_, Arc<SubscriptionManager>>
 ) -> Result<bool, String> {
-    let pool = PgPoolOptions::new()
-        .max_connections(5)
-        .connect("postgresql://gbilly_sysadmin:BillyJinn228@localhost:5433/Voice-ka_Local")
-        .await
-        .map_err(|e| e.to_string())?;
+    let pool = crate::db::get_db_pool()
+        .ok_or("База данных не подключена")?;
     
     // Получаем гильдии пользователя ДО выхода для отправки уведомлений
     let user_guilds: Vec<i32> = sqlx::query_scalar(
         "SELECT guild_id FROM guild_members WHERE user_id = $1"
     )
     .bind(user_id)
-    .fetch_all(&pool)
+    .fetch_all(pool)
     .await
     .unwrap_or_default();
     
-    // Получаем данные пользователя для уведомления
+    // Остальной код без изменений...
     let user_data = sqlx::query_as::<_, (String, Option<String>)>(
         "SELECT username, avatar FROM users WHERE id = $1"
     )
     .bind(user_id)
-    .fetch_optional(&pool)
+    .fetch_optional(pool)
     .await
     .map_err(|e| e.to_string())?;
     
-    // Начинаем транзакцию для атомарности операций
+    // Начинаем транзакцию
     let mut transaction = pool
         .begin()
         .await
@@ -57,7 +54,6 @@ pub async fn logout(
         .await
         .map_err(|e| format!("Ошибка закрытия сессии: {}", e))?;
     } else {
-        // Закрываем все активные сессии пользователя
         sqlx::query(
             "UPDATE websocket_sessions 
             SET status = 'closed', 
@@ -101,7 +97,6 @@ pub async fn logout(
         println!("Пользователь с ID {} остался online (активных сессий: {})", user_id, active_sessions);
     }
     
-    // Фиксируем транзакцию
     transaction
         .commit()
         .await
@@ -122,7 +117,6 @@ pub async fn logout(
                 user_status
             );
             
-            // Отправляем уведомление во все гильдии пользователя
             for guild_id in &user_guilds {
                 println!("📤 Отправка уведомления о выходе в гильдию {}", guild_id);
                 ws_manager.broadcast_to_guild(*guild_id, ws_message.clone()).await;

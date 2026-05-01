@@ -26,7 +26,7 @@ pub struct UserStats {
 
 #[command]
 pub async fn get_current_user(session_id: Option<String>) -> Result<User, String> {
-    let pool = get_db_pool();
+    let pool = get_db_pool().ok_or("База данных не подключена")?;
     
     if let Some(sid) = session_id {
         let user = sqlx::query_as::<_, User>(
@@ -57,7 +57,7 @@ pub async fn get_current_user_simple() -> Result<User, String> {
 
 #[command]
 pub async fn get_user_stats(user_id: i32) -> Result<UserStats, String> {
-    let pool = get_db_pool();
+    let pool = get_db_pool().ok_or("База данных не подключена")?;
     
     // Получаем количество сообщений
     let total_messages: i64 = sqlx::query_scalar(
@@ -129,7 +129,7 @@ pub async fn update_user_profile(
     current_password: Option<String>,
     new_password: Option<String>,
 ) -> Result<String, String> {
-    let pool = get_db_pool();
+    let pool = get_db_pool().ok_or("База данных не подключена")?;
     
     // Проверяем существование пользователя
     let user_exists: bool = sqlx::query_scalar(
@@ -177,7 +177,7 @@ pub async fn update_user_profile(
 
 #[command]
 pub async fn get_user_guilds_with_role(user_id: i32) -> Result<Vec<serde_json::Value>, String> {
-    let pool = get_db_pool();
+    let pool = get_db_pool().ok_or("База данных не подключена")?;
     
     let guilds = sqlx::query_as::<_, (i32, String, Option<String>, String)>(
         r#"
@@ -224,7 +224,7 @@ pub struct UserStatus {
 
 #[command]
 pub async fn get_online_guild_members(guild_id: i32) -> Result<Vec<UserStatus>, String> {
-    let pool = get_db_pool();
+    let pool = get_db_pool().ok_or("База данных не подключена")?;
     
     let members = sqlx::query_as::<_, UserStatus>(
         r#"
@@ -236,7 +236,7 @@ pub async fn get_online_guild_members(guild_id: i32) -> Result<Vec<UserStatus>, 
         FROM guild_members gm
         JOIN users u ON gm.user_id = u.id
         WHERE gm.guild_id = $1 
-          AND u.status IN ('online', 'idle', 'dnd')
+            AND u.status IN ('online', 'idle', 'dnd')
         ORDER BY u.username ASC
         "#
     )
@@ -272,7 +272,7 @@ pub async fn notify_user_status_change(
     guild_id: i32,
     ws_manager: State<'_, Arc<SubscriptionManager>>
 ) -> Result<(), String> {
-    let pool = get_db_pool();
+    let pool = get_db_pool().ok_or("База данных не подключена")?;
     
     // Получаем информацию о пользователе
     let user = sqlx::query_as::<_, UserStatus>(
@@ -309,7 +309,7 @@ pub async fn notify_user_joined_guild(
     guild_id: i32,
     ws_manager: State<'_, Arc<SubscriptionManager>>
 ) -> Result<(), String> {
-    let pool = get_db_pool();
+    let pool = get_db_pool().ok_or("База данных не подключена")?;
     
     // Получаем информацию о пользователе
     let user = sqlx::query_as::<_, UserStatus>(

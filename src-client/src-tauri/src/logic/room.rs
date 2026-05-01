@@ -48,7 +48,7 @@ struct IdResult {
 
 #[command]
 pub async fn get_guild_rooms(guild_id: i32) -> Result<Vec<RoomData>, String> {
-    let pool = get_db_pool();
+    let pool = get_db_pool().ok_or("База данных не подключена")?;
     
     let rooms = sqlx::query_as::<_, RoomData>(
         r#"
@@ -81,7 +81,7 @@ pub async fn get_guild_rooms(guild_id: i32) -> Result<Vec<RoomData>, String> {
 
 #[command]
 pub async fn get_user_rooms(user_id: i32) -> Result<Vec<RoomData>, String> {
-    let pool = get_db_pool();
+    let pool = get_db_pool().ok_or("База данных не подключена")?;
     
     let rooms = sqlx::query_as::<_, RoomData>(
         r#"
@@ -115,7 +115,7 @@ pub async fn get_user_rooms(user_id: i32) -> Result<Vec<RoomData>, String> {
 
 #[command]
 pub async fn get_room_by_id(room_id: i32) -> Result<Option<RoomData>, String> {
-    let pool = get_db_pool();
+    let pool = get_db_pool().ok_or("База данных не подключена")?;
     
     let room = sqlx::query_as::<_, RoomData>(
         r#"
@@ -150,7 +150,7 @@ pub async fn create_room(
     room_data: CreateRoomData,
     ws_manager: State<'_, Arc<SubscriptionManager>>
 ) -> Result<RoomData, String> {
-    let pool = get_db_pool();
+    let pool = get_db_pool().ok_or("База данных не подключена")?;
     
     // Проверяем, является ли пользователь участником гильдии
     let is_member = sqlx::query_as::<_, ExistsResult>(
@@ -249,7 +249,7 @@ pub async fn update_room(
     user_limit: Option<i32>,
     user_id: i32,
 ) -> Result<RoomData, String> {
-    let pool = get_db_pool();
+    let pool = get_db_pool().ok_or("База данных не подключена")?;
     
     // Проверяем права (нужно быть участником гильдии)
     let has_permission = sqlx::query_as::<_, ExistsResult>(
@@ -338,7 +338,7 @@ pub async fn update_room(
 
 #[command]
 pub async fn delete_room(room_id: i32, user_id: i32) -> Result<(), String> {
-    let pool = get_db_pool();
+    let pool = get_db_pool().ok_or("База данных не подключена")?;
     
     // Проверяем права (нужно быть создателем гильдии или иметь специальные права)
     let is_owner = sqlx::query_as::<_, ExistsResult>(
@@ -374,7 +374,7 @@ pub async fn delete_room(room_id: i32, user_id: i32) -> Result<(), String> {
 
 #[command]
 pub async fn create_dm_room(user_id1: i32, user_id2: i32) -> Result<RoomData, String> {
-    let pool = get_db_pool();
+    let pool = get_db_pool().ok_or("База данных не подключена")?;
     
     // Проверяем, существует ли уже DM между этими пользователями
     let existing_dm = sqlx::query_as::<_, IdResult>(
@@ -384,8 +384,8 @@ pub async fn create_dm_room(user_id1: i32, user_id2: i32) -> Result<RoomData, St
         JOIN dm_participants dp1 ON r.id = dp1.room_id
         JOIN dm_participants dp2 ON r.id = dp2.room_id
         WHERE r.type = 'dm' 
-          AND dp1.user_id = $1 
-          AND dp2.user_id = $2
+            AND dp1.user_id = $1 
+            AND dp2.user_id = $2
         "#
     )
     .bind(user_id1)

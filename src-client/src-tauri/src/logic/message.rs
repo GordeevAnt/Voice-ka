@@ -23,7 +23,7 @@ pub struct MessageData {
 
 #[command]
 pub async fn get_room_messages(room_id: i32) -> Result<Vec<MessageData>, String> {
-    let pool = get_db_pool();
+    let pool = get_db_pool().ok_or("База данных не подключена")?;
     
     let messages = sqlx::query_as::<_, MessageData>(
         r#"
@@ -59,7 +59,7 @@ pub async fn send_message(
     session_id: Option<String>,
     ws_manager: tauri::State<'_, Arc<SubscriptionManager>>
 ) -> Result<MessageData, String> {
-    let pool = get_db_pool();
+    let pool = get_db_pool().ok_or("База данных не подключена")?;
     
     let current_user = get_current_user(session_id)
         .await

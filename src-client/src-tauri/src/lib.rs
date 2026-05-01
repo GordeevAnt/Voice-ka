@@ -14,8 +14,8 @@ pub use register::register;
 mod logout;
 pub use logout::logout;
 
-use db::init_database;
-use ws::{SubscriptionManager, server::start_websocket_server};
+// use db::init_database;
+use ws::{SubscriptionManager};
 use std::sync::Arc;
 use tauri::Manager;
 
@@ -50,6 +50,15 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .setup(|app| {
+            let ws_manager = Arc::new(SubscriptionManager::new());
+            app.manage(ws_manager);
+
+            tauri::async_runtime::spawn(async {
+                if let Err(e) = db::connect_database().await {
+                    eprintln!("❌ Ошибка подключения к базе данных: {}", e);
+                }
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
