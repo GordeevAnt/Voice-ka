@@ -130,7 +130,7 @@ impl SubscriptionManager {
         let rooms = self.room_subscriptions.lock().await;
         let connections = self.connections.lock().await;
 
-         if let Some(conn_ids) = rooms.get(&room_id) {
+        if let Some(conn_ids) = rooms.get(&room_id) {
             for conn_id in conn_ids {
                 if let Some(sender) = connections.get(conn_id) {
                     let _ = sender.send(message.clone());
