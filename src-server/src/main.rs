@@ -226,8 +226,8 @@ async fn handle_send_message(
     
     let msg_result = sqlx::query!(
         "INSERT INTO messages (room_id, user_id, content, attachments) 
-         VALUES ($1, $2, $3, '[]'::jsonb) 
-         RETURNING id, room_id, user_id, content, created_at",
+            VALUES ($1, $2, $3, '[]'::jsonb) 
+            RETURNING id, room_id, user_id, content, created_at",
         room_id as i32,
         user.0,
         content
