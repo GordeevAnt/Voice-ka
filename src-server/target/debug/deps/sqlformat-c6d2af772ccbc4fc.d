@@ -1,0 +1,10 @@
+E:\Voice-ka\src-server\target\debug\deps\sqlformat-c6d2af772ccbc4fc.d: C:\Users\GrandYT228\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlformat-0.2.6\src\lib.rs C:\Users\GrandYT228\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlformat-0.2.6\src\formatter.rs C:\Users\GrandYT228\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlformat-0.2.6\src\indentation.rs C:\Users\GrandYT228\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlformat-0.2.6\src\inline_block.rs C:\Users\GrandYT228\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlformat-0.2.6\src\params.rs C:\Users\GrandYT228\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlformat-0.2.6\src\tokenizer.rs
+
+E:\Voice-ka\src-server\target\debug\deps\libsqlformat-c6d2af772ccbc4fc.rmeta: C:\Users\GrandYT228\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlformat-0.2.6\src\lib.rs C:\Users\GrandYT228\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlformat-0.2.6\src\formatter.rs C:\Users\GrandYT228\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlformat-0.2.6\src\indentation.rs C:\Users\GrandYT228\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlformat-0.2.6\src\inline_block.rs C:\Users\GrandYT228\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlformat-0.2.6\src\params.rs C:\Users\GrandYT228\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlformat-0.2.6\src\tokenizer.rs
+
+C:\Users\GrandYT228\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlformat-0.2.6\src\lib.rs:
+C:\Users\GrandYT228\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlformat-0.2.6\src\formatter.rs:
+C:\Users\GrandYT228\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlformat-0.2.6\src\indentation.rs:
+C:\Users\GrandYT228\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlformat-0.2.6\src\inline_block.rs:
+C:\Users\GrandYT228\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlformat-0.2.6\src\params.rs:
+C:\Users\GrandYT228\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sqlformat-0.2.6\src\tokenizer.rs:
