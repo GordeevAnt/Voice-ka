@@ -9,10 +9,10 @@ import { Rooms_List } from "../features/Rooms_List"
 import "./Main_Page.css"
 import { Chanels_List } from "../features/Chanels_List"
 import { Logout } from "../entities/Logout"
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
 import { storeAPI } from "../features/useStore"
-import { useWebSocket } from "../features/useWebsocket"
+import { wsService } from "../features/websocket.service"
 
 export function Main_Page() {
     const navigate = useNavigate();
@@ -20,16 +20,14 @@ export function Main_Page() {
     const [currentGuildId, setCurrentGuildId] = useState<number | null>(null);
     const [currentRoomId, setCurrentRoomId] = useState<number | undefined>(undefined);
     const [currentUserId, setCurrentUserId] = useState<number>(1);
-    
-    // Ref для отслеживания предыдущей гильдии
-    const previousGuildIdRef = useRef<number | null>(null);
+    const [isConnected, setIsConnected] = useState(false);
 
     useEffect(() => {
         const loadUserData = async () => {
             console.log('Main_Page: Loading user data...');
             
             const token = await storeAPI.get('token');
-            const userId = await storeAPI.get('user_id');
+            const userId = await storeAPI.get<number>('user_id');
             const sessionId = await storeAPI.get('session_id');
             
             if (!token || !userId || !sessionId) {
@@ -37,70 +35,46 @@ export function Main_Page() {
                 return;
             }
             
-            setCurrentUserId(parseInt(userId as string));
+            setCurrentUserId(userId);
             
-            const savedGuildId = await storeAPI.get('current_guild_id');
+            const savedGuildId = await storeAPI.get<number>('current_guild_id');
             if (savedGuildId) {
-                const guildId = parseInt(savedGuildId as string);
-                setCurrentGuildId(guildId);
-                previousGuildIdRef.current = guildId;
+                setCurrentGuildId(savedGuildId);
             }
             
-            const savedRoomId = await storeAPI.get('current_room_id');
+            const savedRoomId = await storeAPI.get<number>('current_room_id');
             if (savedRoomId) {
-                setCurrentRoomId(parseInt(savedRoomId as string));
+                setCurrentRoomId(savedRoomId);
             }
             
             setIsLoading(false);
         };
         
         loadUserData();
+        
+        // Следим за состоянием подключения WebSocket
+        const unsubscribe = wsService.onConnectionChange((connected) => {
+            setIsConnected(connected);
+        });
+        
+        setIsConnected(wsService.getConnectionStatus());
+        
+        return () => {
+            unsubscribe();
+        };
     }, [navigate]);
-
-    // Используем ОДИН WebSocket для всей страницы
-    const handleNewMessage = useCallback((message: any) => {
-        console.log('New message from WS:', message);
-    }, []);
-
-    // ВСЕГДА передаем currentGuildId в useWebSocket, даже если он null
-    const { isConnected, wsRef, lastMessage, subscribeToGuild, unsubscribeFromGuild } = useWebSocket({
-        currentGuildId: currentGuildId ?? undefined,
-        currentRoomId,
-        onNewMessage: handleNewMessage,
-    });
-
-    // Подписка на новую гильдию при её смене
-    useEffect(() => {
-        if (!currentGuildId) return;
-        
-        console.log(`🔄 Guild changed from ${previousGuildIdRef.current} to ${currentGuildId}`);
-        
-        // Отписываемся от предыдущей гильдии
-        if (previousGuildIdRef.current && previousGuildIdRef.current !== currentGuildId) {
-            console.log(`📤 Unsubscribing from guild: ${previousGuildIdRef.current}`);
-            unsubscribeFromGuild(previousGuildIdRef.current);
-        }
-        
-        // Подписываемся на новую гильдию
-        console.log(`📥 Subscribing to guild: ${currentGuildId}`);
-        subscribeToGuild(currentGuildId);
-        
-        // Обновляем ref
-        previousGuildIdRef.current = currentGuildId;
-        
-    }, [currentGuildId, subscribeToGuild, unsubscribeFromGuild]);
 
     const handleGuildSelect = useCallback(async (guildId: number) => {
         console.log(`🔄 Switching to guild: ${guildId}`);
         setCurrentGuildId(guildId);
-        await storeAPI.set('current_guild_id', guildId.toString());
+        await storeAPI.set('current_guild_id', guildId);
         setCurrentRoomId(undefined);
         await storeAPI.delete('current_room_id');
     }, []);
 
     const handleRoomSelect = useCallback(async (roomId: number) => {
         setCurrentRoomId(roomId);
-        await storeAPI.set('current_room_id', roomId.toString());
+        await storeAPI.set('current_room_id', roomId);
     }, []);
 
     if (isLoading) {
@@ -110,6 +84,9 @@ export function Main_Page() {
     if (!currentGuildId) {
         return (
             <div className="main-page-container">
+                <div className="connection-status">
+                    {!isConnected && <span className="disconnected">🔄 Подключение к серверу...</span>}
+                </div>
                 <div className="main-container">
                     <div className="welcome-placeholder">
                         <h2>Добро пожаловать!</h2>
@@ -136,8 +113,6 @@ export function Main_Page() {
                         key={`messenger-${currentGuildId}-${currentRoomId}`}
                         roomId={currentRoomId} 
                         currentUserId={currentUserId}
-                        wsRef={wsRef}
-                        newMessage={lastMessage}
                     />
                 ) : (
                     <div className="messenger-field">

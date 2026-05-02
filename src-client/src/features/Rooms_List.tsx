@@ -1,10 +1,10 @@
-// Rooms_List.tsx - исправленная версия
+// Rooms_List.tsx
 import { useEffect, useState, useCallback, memo } from "react";
 import "./Rooms_List.css";
-import { invoke } from "@tauri-apps/api/core";
-import { Switch_Room_Button } from "../shared/Switch_Room_Button";
+import { apiService } from "../features/api.service";
 import { storeAPI } from "../features/useStore";
-import { useWebSocket } from "./useWebsocket";
+import { wsService } from "../features/websocket.service";
+import { Switch_Room_Button } from "../shared/Switch_Room_Button";
 
 interface RoomData {
     id: number;
@@ -29,24 +29,39 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
     const [error, setError] = useState<string | null>(null);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [newRoomName, setNewRoomName] = useState("");
-    const [newRoomType, setNewRoomType] = useState("text");
     const [newRoomTopic, setNewRoomTopic] = useState("");
 
-    // Обработчик создания новой комнаты через WebSocket
-    const handleRoomCreated = useCallback((room: RoomData) => {
-        console.log('🆕 Room created via WS:', room);
-        setRooms(prev => {
-            const exists = prev.some(r => r.id === room.id);
-            if (exists) return prev;
-            return [...prev, room];
+    useEffect(() => {
+        // Подписываемся на события комнат
+        const unsubscribeRoomCreated = wsService.on('room_created', (room) => {
+            console.log('🆕 Room created via WS:', room);
+            if (room.guild_id === guildId) {
+                setRooms(prev => {
+                    const exists = prev.some(r => r.id === room.id);
+                    if (exists) return prev;
+                    return [...prev, room];
+                });
+            }
         });
-    }, []);
-
-    // Используем WebSocket для получения уведомлений о новых комнатах
-    useWebSocket({
-        currentGuildId: guildId,
-        onRoomCreated: handleRoomCreated,
-    });
+        
+        const unsubscribeRoomUpdated = wsService.on('room_updated', (room) => {
+            if (room.guild_id === guildId) {
+                setRooms(prev => prev.map(r => r.id === room.id ? room : r));
+            }
+        });
+        
+        const unsubscribeRoomDeleted = wsService.on('room_deleted', (data) => {
+            if (data.guild_id === guildId) {
+                setRooms(prev => prev.filter(r => r.id !== data.room_id));
+            }
+        });
+        
+        return () => {
+            unsubscribeRoomCreated();
+            unsubscribeRoomUpdated();
+            unsubscribeRoomDeleted();
+        };
+    }, [guildId]);
 
     const loadRooms = useCallback(async () => {
         if (!guildId) return;
@@ -55,7 +70,7 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
         setError(null);
         
         try {
-            const guildRooms = await invoke<RoomData[]>("get_guild_rooms", { guildId });
+            const guildRooms = await apiService.getGuildRooms(guildId);
             console.log('📋 Loaded rooms:', guildRooms);
             setRooms(guildRooms);
         } catch (err) {
@@ -68,7 +83,14 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
 
     useEffect(() => {
         loadRooms();
-    }, [loadRooms]);
+        
+        // Подписываемся на комнату гильдии
+        wsService.subscribeGuild(guildId);
+        
+        return () => {
+            wsService.unsubscribeGuild(guildId);
+        };
+    }, [loadRooms, guildId]);
 
     const handleCreateRoom = useCallback(async () => {
         if (!newRoomName.trim()) {
@@ -76,27 +98,23 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
             return;
         }
         
-        const userId = await storeAPI.get<string>('user_id');
+        const userId = await storeAPI.get<number>('user_id');
         if (!userId) {
             alert("Пользователь не авторизован");
             return;
         }
         
         try {
-            // Комната будет добавлена через WebSocket, но также получаем её здесь для немедленного отображения
-            const newRoom = await invoke<RoomData>("create_room", {
-                roomData: {
-                    name: newRoomName.trim(),
-                    room_type: newRoomType,
-                    guild_id: guildId,
-                    topic: newRoomTopic.trim() || null,
-                    bitrate: newRoomType === 'voice' ? 64000 : null,
-                    user_limit: newRoomType === 'voice' ? 0 : null,
-                    creator_id: parseInt(userId) 
-                }
+            const newRoom = await apiService.createRoom({
+                name: newRoomName.trim(),
+                room_type: 'text',
+                guild_id: guildId,
+                topic: newRoomTopic.trim() || null,
+                bitrate: null,
+                user_limit: null,
+                creator_id: userId
             });
             
-            // WebSocket обновит список автоматически, но для мгновенного отклика добавляем сразу
             setRooms(prev => {
                 const exists = prev.some(r => r.id === newRoom.id);
                 if (exists) return prev;
@@ -114,7 +132,7 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
             console.error("Create room error:", err);
             alert(err instanceof Error ? err.message : "Ошибка создания комнаты");
         }
-    }, [newRoomName, newRoomType, newRoomTopic, guildId, onRoomSelect]);
+    }, [newRoomName, newRoomTopic, guildId, onRoomSelect]);
 
     if (loading && rooms.length === 0) {
         return (
@@ -167,9 +185,6 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
                             onChange={(e) => setNewRoomName(e.target.value)}
                             autoFocus
                         />
-                        <select value={newRoomType} onChange={(e) => setNewRoomType(e.target.value)}>
-                            <option value="text">Текстовая</option>
-                        </select>
                         <textarea
                             placeholder="Тема (необязательно)"
                             value={newRoomTopic}

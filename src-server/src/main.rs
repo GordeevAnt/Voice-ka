@@ -1,308 +1,94 @@
 // src-server/src/main.rs
+mod ws;
+mod db;
+mod handlers;
+
 use std::sync::Arc;
+use serde_json::json;
 use tokio::net::TcpListener;
 use tokio_tungstenite::accept_async;
 use futures_util::{SinkExt, StreamExt};
-use serde::{Serialize, Deserialize};
-use sqlx::postgres::PgPoolOptions;
-use sqlx::PgPool;
-use std::collections::{HashMap, HashSet};
-use tokio::sync::{Mutex, broadcast};
-use chrono::Utc;
-use argon2::{Argon2, PasswordHash, PasswordVerifier};
+use ws::manager::SubscriptionManager;
+use ws::messages::{WsMessage, WsClientMessage};
+use handlers::auth::{handle_login, handle_register, handle_logout, validate_session, LoginData, RegisterData};
+use handlers::guild::{handle_get_user_guilds, handle_create_guild, handle_join_guild, handle_get_guild_members, CreateGuildData};
+use handlers::message::{handle_get_room_messages, handle_send_message};
+use handlers::room::{handle_get_guild_rooms, handle_create_room, CreateRoomData};
 use uuid::Uuid;
-
-type ConnectionId = String;
-
-// ========== WebSocket Message Types ==========
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WsMessage {
-    #[serde(rename = "type")]
-    pub message_type: String,
-    pub room_id: Option<i32>,
-    pub guild_id: Option<i32>,
-    pub data: serde_json::Value,
-    pub timestamp: String,
-}
-
-impl WsMessage {
-    fn new(message_type: &str, data: serde_json::Value) -> Self {
-        Self {
-            message_type: message_type.to_string(),
-            room_id: None,
-            guild_id: None,
-            data,
-            timestamp: Utc::now().to_rfc3339(),
-        }
-    }
-
-    fn with_room(mut self, room_id: i32) -> Self {
-        self.room_id = Some(room_id);
-        self
-    }
-
-    fn with_guild(mut self, guild_id: i32) -> Self {
-        self.guild_id = Some(guild_id);
-        self
-    }
-}
-
-#[derive(Debug, Deserialize)]
-pub struct WsClientMessage {
-    #[serde(rename = "type")]
-    pub message_type: String,
-    pub room_id: Option<i32>,
-    pub guild_id: Option<i32>,
-    pub data: Option<serde_json::Value>,
-}
-
-// ========== Subscription Manager ==========
-
-pub struct SubscriptionManager {
-    room_subscriptions: Arc<Mutex<HashMap<i32, HashSet<ConnectionId>>>>,
-    guild_subscriptions: Arc<Mutex<HashMap<i32, HashSet<ConnectionId>>>>,
-    connections: Arc<Mutex<HashMap<ConnectionId, broadcast::Sender<WsMessage>>>>,
-}
-
-impl SubscriptionManager {
-    fn new() -> Self {
-        Self {
-            room_subscriptions: Arc::new(Mutex::new(HashMap::new())),
-            guild_subscriptions: Arc::new(Mutex::new(HashMap::new())),
-            connections: Arc::new(Mutex::new(HashMap::new())),
-        }
-    }
-
-    async fn add_connection(&self, connection_id: ConnectionId) -> broadcast::Receiver<WsMessage> {
-        let (tx, rx) = broadcast::channel(100);
-        self.connections.lock().await.insert(connection_id, tx);
-        rx
-    }
-
-    async fn remove_connection(&self, connection_id: &str) {
-        let mut connections = self.connections.lock().await;
-        connections.remove(connection_id);
-
-        let mut rooms = self.room_subscriptions.lock().await;
-        for (_, conns) in rooms.iter_mut() {
-            conns.remove(connection_id);
-        }
-
-        let mut guilds = self.guild_subscriptions.lock().await;
-        for (_, conns) in guilds.iter_mut() {
-            conns.remove(connection_id);
-        }
-    }
-
-    async fn subscribe_room(&self, room_id: i32, connection_id: &str) {
-        self.room_subscriptions
-            .lock()
-            .await
-            .entry(room_id)
-            .or_insert_with(HashSet::new)
-            .insert(connection_id.to_string());
-    }
-
-    async fn unsubscribe_room(&self, room_id: i32, connection_id: &str) {
-        if let Some(conns) = self.room_subscriptions.lock().await.get_mut(&room_id) {
-            conns.remove(connection_id);
-        }
-    }
-
-    async fn subscribe_guild(&self, guild_id: i32, connection_id: &str) {
-        self.guild_subscriptions
-            .lock()
-            .await
-            .entry(guild_id)
-            .or_insert_with(HashSet::new)
-            .insert(connection_id.to_string());
-    }
-
-    async fn unsubscribe_guild(&self, guild_id: i32, connection_id: &str) {
-        if let Some(conns) = self.guild_subscriptions.lock().await.get_mut(&guild_id) {
-            conns.remove(connection_id);
-        }
-    }
-
-    async fn broadcast_to_room(&self, room_id: i32, message: WsMessage) {
-        let message = message.with_room(room_id);
-        let rooms = self.room_subscriptions.lock().await;
-        let connections = self.connections.lock().await;
-
-        if let Some(conn_ids) = rooms.get(&room_id) {
-            for conn_id in conn_ids {
-                if let Some(sender) = connections.get(conn_id) {
-                    let _ = sender.send(message.clone());
-                }
-            }
-        }
-    }
-
-    async fn broadcast_to_guild(&self, guild_id: i32, message: WsMessage) {
-        let message = message.with_guild(guild_id);
-        let guilds = self.guild_subscriptions.lock().await;
-        let connections = self.connections.lock().await;
-
-        if let Some(conn_ids) = guilds.get(&guild_id) {
-            for conn_id in conn_ids {
-                if let Some(sender) = connections.get(conn_id) {
-                    let _ = sender.send(message.clone());
-                }
-            }
-        }
-    }
-
-    async fn send_to_user(&self, connection_id: &str, message: WsMessage) {
-        let connections = self.connections.lock().await;
-        if let Some(sender) = connections.get(connection_id) {
-            let _ = sender.send(message);
-        }
-    }
-}
-
-// ========== Database ==========
-
-static DB_POOL: once_cell::sync::OnceCell<PgPool> = once_cell::sync::OnceCell::new();
-
-async fn init_database() -> Result<&'static PgPool, Box<dyn std::error::Error>> {
-    dotenvy::dotenv().ok();
-    let database_url = std::env::var("DATABASE_URL")
-        .expect("DATABASE_URL не установлена в .env файле");
-    
-    let pool = PgPoolOptions::new()
-        .max_connections(10)
-        .connect(&database_url)
-        .await?;
-    
-    DB_POOL.set(pool).unwrap();
-    Ok(DB_POOL.get().unwrap())
-}
-
-fn get_db_pool() -> &'static PgPool {
-    DB_POOL.get().expect("База данных не инициализирована")
-}
-
-// ========== Authentication ==========
-
-async fn authenticate_user(session_id: &str, pool: &PgPool) -> Option<(i32, String)> {
-    let result = sqlx::query!(
-        "SELECT u.id, u.username FROM users u 
-            INNER JOIN websocket_sessions ws ON u.id = ws.user_id 
-            WHERE ws.connection_id = $1 AND ws.status = 'active'",
-        session_id
-    )
-    .fetch_optional(pool)
-    .await
-    .ok()?;
-    
-    result.map(|r| (r.id, r.username))
-}
-
-// ========== Message Handler ==========
-
-async fn handle_send_message(
-    data: &serde_json::Value,
-    manager: Arc<SubscriptionManager>,
-    pool: &PgPool,
-) {
-    let room_id = match data.get("room_id").and_then(|v| v.as_i64()) {
-        Some(id) => id,
-        None => return,
-    };
-    let content = match data.get("content").and_then(|v| v.as_str()) {
-        Some(c) => c,
-        None => return,
-    };
-    let session_id = match data.get("session_id").and_then(|v| v.as_str()) {
-        Some(s) => s,
-        None => return,
-    };
-    
-    let user = match authenticate_user(session_id, pool).await {
-        Some(u) => u,
-        None => return,
-    };
-    
-    let msg_result = sqlx::query!(
-        "INSERT INTO messages (room_id, user_id, content, attachments) 
-            VALUES ($1, $2, $3, '[]'::jsonb) 
-            RETURNING id, room_id, user_id, content, created_at",
-        room_id as i32,
-        user.0,
-        content
-    )
-    .fetch_one(pool)
-    .await
-    .ok();
-    
-    if let Some(msg) = msg_result {
-        let message_data = serde_json::json!({
-            "id": msg.id,
-            "room_id": msg.room_id,
-            "user_id": msg.user_id,
-            "content": msg.content,
-            "author_name": user.1,
-            "created_at": msg.created_at.to_rfc3339(),
-            "attachments": [],
-            "reply_to_id": null,
-            "edited_at": null,
-            "deleted_at": null
-        });
-        
-        let ws_msg = WsMessage::new("new_message", message_data).with_room(room_id as i32);
-        manager.broadcast_to_room(room_id as i32, ws_msg).await;
-    }
-}
-
-// ========== Main Server ==========
+use chrono::Utc;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args: Vec<String> = std::env::args().collect();
+    let should_migrate = args.contains(&"--migrate".to_string()) || args.contains(&"-m".to_string());
+    
+    if should_migrate {
+        println!("🚀 Running database migrations...");
+        db::init_database().await?;
+        println!("✅ Migrations completed!");
+        return Ok(());
+    }
+    
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
-    
+
     println!("🚀 Starting Voice-ka WebSocket Server...");
-    
-    let pool = init_database().await?;
+
+    db::connect_database().await?;
     println!("✅ Database connected");
-    
+
     let manager = Arc::new(SubscriptionManager::new());
-    
+
     let port = std::env::var("WS_PORT")
         .ok()
         .and_then(|p| p.parse().ok())
         .unwrap_or(9001);
-    
+
     let addr = format!("0.0.0.0:{}", port);
     let listener = TcpListener::bind(&addr).await?;
-    
+
     println!("🔌 WebSocket server listening on ws://{}", addr);
     println!("📡 Waiting for connections...");
-    
+
     while let Ok((stream, addr)) = listener.accept().await {
         println!("📡 New connection from: {}", addr);
-        
+
         let manager = manager.clone();
-        let pool = pool.clone();
-        
+
         tokio::spawn(async move {
             if let Ok(ws_stream) = accept_async(stream).await {
                 let (mut write, mut read) = ws_stream.split();
-                
                 let connection_id = Uuid::new_v4().to_string();
-                let mut broadcast_rx = manager.add_connection(connection_id.clone()).await;
+
+                let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+
+                // НЕ ЖДЕМ АУТЕНТИФИКАЦИЮ СРАЗУ!
+                // Просто добавляем соединение без аутентификации
+                // Создаем временную информацию о соединении
+                let temp_info = ws::manager::ConnectionInfo {
+                    user_id: 0,  // Временный ID для неаутентифицированного пользователя
+                    username: "anonymous".to_string(),
+                    session_token: connection_id.clone(),
+                };
                 
-                let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<tokio_tungstenite::tungstenite::Message>();
-                
+                let mut broadcast_rx = manager.add_connection(connection_id.clone(), temp_info).await;
+
+                // Отправляем приветственное сообщение
+                let welcome_msg = WsMessage::success_response("", json!({
+                    "status": "connected",
+                    "connection_id": connection_id
+                }));
+                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                    serde_json::to_string(&welcome_msg).unwrap()
+                ));
+
+                // Задача отправки
                 let write_task = tokio::spawn(async move {
                     loop {
                         tokio::select! {
                             Some(msg) = rx.recv() => {
-                                if write.send(msg).await.is_err() {
-                                    break;
-                                }
+                                if write.send(msg).await.is_err() { break; }
                             }
                             Ok(msg) = broadcast_rx.recv() => {
                                 if let Ok(text) = serde_json::to_string(&msg) {
@@ -315,53 +101,365 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                 });
-                
+
+                // Обработка сообщений
                 while let Some(msg_result) = read.next().await {
                     match msg_result {
                         Ok(msg) => {
                             if let Ok(text) = msg.to_text() {
                                 if let Ok(client_msg) = serde_json::from_str::<WsClientMessage>(text) {
+                                    // Получаем текущую информацию о соединении
+                                    let current_user_id = manager.get_user_id(&connection_id).await;
+                                    let current_username = manager.get_username(&connection_id).await;
+                                    let request_id = client_msg.request_id.as_deref().unwrap_or("");
+
                                     match client_msg.message_type.as_str() {
                                         "ping" => {
-                                            let pong = serde_json::json!({
-                                                "type": "pong",
-                                                "timestamp": Utc::now().to_rfc3339()
-                                            });
+                                            let pong = json!({ "type": "pong", "timestamp": Utc::now().to_rfc3339() });
                                             let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(pong.to_string()));
                                         }
+
+                                        // АУТЕНТИФИКАЦИЯ (теперь обрабатывается как обычный запрос)
+                                        "auth" => {
+                                            if let Some(data) = client_msg.data {
+                                                if let Some(token) = data.get("session_token").and_then(|v| v.as_str()) {
+                                                    if let Some(info) = validate_session(token).await {
+                                                        // Обновляем информацию о соединении
+                                                        manager.update_connection_info(&connection_id, info.clone()).await;
+                                                        
+                                                        let resp = WsMessage::success_response(request_id, json!({
+                                                            "success": true,
+                                                            "user_id": info.user_id,
+                                                            "username": info.username
+                                                        }));
+                                                        let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                            serde_json::to_string(&resp).unwrap()
+                                                        ));
+                                                        
+                                                        println!("✅ User {} (ID: {}) authenticated on connection {}", 
+                                                                info.username, info.user_id, connection_id);
+                                                    } else {
+                                                        let resp = WsMessage::error_response(request_id, "Invalid session token");
+                                                        let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                            serde_json::to_string(&resp).unwrap()
+                                                        ));
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // AUTH - LOGIN
+                                        "login" => {
+                                            if let Some(data) = client_msg.data {
+                                                if let Ok(login_data) = serde_json::from_value::<LoginData>(data) {
+                                                    match handle_login(login_data).await {
+                                                        Ok(response) => {
+                                                            let resp = WsMessage::success_response(request_id, serde_json::to_value(&response).unwrap());
+                                                            let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                serde_json::to_string(&resp).unwrap()
+                                                            ));
+                                                        }
+                                                        Err(e) => {
+                                                            let resp = WsMessage::error_response(request_id, &e);
+                                                            let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                serde_json::to_string(&resp).unwrap()
+                                                            ));
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // AUTH - REGISTER
+                                        "register" => {
+                                            if let Some(data) = client_msg.data {
+                                                if let Ok(reg_data) = serde_json::from_value::<RegisterData>(data) {
+                                                    match handle_register(reg_data).await {
+                                                        Ok((success, user_id)) => {
+                                                            let resp = WsMessage::success_response(request_id, json!({ "success": success, "user_id": user_id }));
+                                                            let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                serde_json::to_string(&resp).unwrap()
+                                                            ));
+                                                        }
+                                                        Err(e) => {
+                                                            let resp = WsMessage::error_response(request_id, &e);
+                                                            let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                serde_json::to_string(&resp).unwrap()
+                                                            ));
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // LOGOUT
+                                        "logout" => {
+                                            if let Some(uid) = current_user_id {
+                                                match handle_logout(uid, client_msg.session_token).await {
+                                                    Ok(_) => {
+                                                        // Сбрасываем информацию о соединении
+                                                        manager.clear_connection_info(&connection_id).await;
+                                                        
+                                                        let resp = WsMessage::success_response(request_id, json!({ "success": true }));
+                                                        let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                            serde_json::to_string(&resp).unwrap()
+                                                        ));
+                                                    }
+                                                    Err(e) => {
+                                                        let resp = WsMessage::error_response(request_id, &e);
+                                                        let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                            serde_json::to_string(&resp).unwrap()
+                                                        ));
+                                                    }
+                                                }
+                                            } else {
+                                                let resp = WsMessage::error_response(request_id, "Not authenticated");
+                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                    serde_json::to_string(&resp).unwrap()
+                                                ));
+                                            }
+                                        }
+
+                                        // GUILDS
+                                        "get_user_guilds" => {
+                                            if let Some(uid) = current_user_id {
+                                                if uid > 0 {
+                                                    match handle_get_user_guilds(uid).await {
+                                                        Ok(guilds) => {
+                                                            let resp = WsMessage::success_response(request_id, json!({ "guilds": guilds }));
+                                                            let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                serde_json::to_string(&resp).unwrap()
+                                                            ));
+                                                        }
+                                                        Err(e) => {
+                                                            let resp = WsMessage::error_response(request_id, &e);
+                                                            let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                serde_json::to_string(&resp).unwrap()
+                                                            ));
+                                                        }
+                                                    }
+                                                } else {
+                                                    let resp = WsMessage::error_response(request_id, "Not authenticated");
+                                                    let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                        serde_json::to_string(&resp).unwrap()
+                                                    ));
+                                                }
+                                            }
+                                        }
+
+                                        "create_guild" => {
+                                            if let (Some(uid), Some(data)) = (current_user_id, client_msg.data) {
+                                                if uid > 0 {
+                                                    if let Ok(guild_data) = serde_json::from_value::<CreateGuildData>(data) {
+                                                        match handle_create_guild(uid, guild_data, manager.clone()).await {
+                                                            Ok(guild) => {
+                                                                let resp = WsMessage::success_response(request_id, json!({ "guild": guild }));
+                                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                    serde_json::to_string(&resp).unwrap()
+                                                                ));
+                                                            }
+                                                            Err(e) => {
+                                                                let resp = WsMessage::error_response(request_id, &e);
+                                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                    serde_json::to_string(&resp).unwrap()
+                                                                ));
+                                                            }
+                                                        }
+                                                    }
+                                                } else {
+                                                    let resp = WsMessage::error_response(request_id, "Not authenticated");
+                                                    let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                        serde_json::to_string(&resp).unwrap()
+                                                    ));
+                                                }
+                                            }
+                                        }
+
+                                        "join_guild" => {
+                                            if let (Some(uid), Some(data)) = (current_user_id, client_msg.data) {
+                                                if uid > 0 {
+                                                    if let Some(guild_id) = data.get("guild_id").and_then(|v| v.as_i64()) {
+                                                        match handle_join_guild(uid, guild_id as i32, manager.clone()).await {
+                                                            Ok(success) => {
+                                                                let resp = WsMessage::success_response(request_id, json!({ "success": success }));
+                                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                    serde_json::to_string(&resp).unwrap()
+                                                                ));
+                                                            }
+                                                            Err(e) => {
+                                                                let resp = WsMessage::error_response(request_id, &e);
+                                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                    serde_json::to_string(&resp).unwrap()
+                                                                ));
+                                                            }
+                                                        }
+                                                    }
+                                                } else {
+                                                    let resp = WsMessage::error_response(request_id, "Not authenticated");
+                                                    let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                        serde_json::to_string(&resp).unwrap()
+                                                    ));
+                                                }
+                                            }
+                                        }
+
+                                        "get_guild_members" => {
+                                            if let Some(guild_id) = client_msg.guild_id {
+                                                match handle_get_guild_members(guild_id).await {
+                                                    Ok(members) => {
+                                                        let resp = WsMessage::success_response(request_id, json!({ "members": members }));
+                                                        let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                            serde_json::to_string(&resp).unwrap()
+                                                        ));
+                                                    }
+                                                    Err(e) => {
+                                                        let resp = WsMessage::error_response(request_id, &e);
+                                                        let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                            serde_json::to_string(&resp).unwrap()
+                                                        ));
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // ROOMS
+                                        "get_guild_rooms" => {
+                                            if let Some(guild_id) = client_msg.guild_id {
+                                                match handle_get_guild_rooms(guild_id).await {
+                                                    Ok(rooms) => {
+                                                        let resp = WsMessage::success_response(request_id, json!({ "rooms": rooms }));
+                                                        let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                            serde_json::to_string(&resp).unwrap()
+                                                        ));
+                                                    }
+                                                    Err(e) => {
+                                                        let resp = WsMessage::error_response(request_id, &e);
+                                                        let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                            serde_json::to_string(&resp).unwrap()
+                                                        ));
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        "create_room" => {
+                                            if let (Some(uid), Some(guild_id), Some(data)) = (current_user_id, client_msg.guild_id, client_msg.data) {
+                                                if uid > 0 {
+                                                    if let Ok(room_data) = serde_json::from_value::<CreateRoomData>(data) {
+                                                        match handle_create_room(guild_id, uid, room_data, manager.clone()).await {
+                                                            Ok(room) => {
+                                                                let resp = WsMessage::success_response(request_id, json!({ "room": room }));
+                                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                    serde_json::to_string(&resp).unwrap()
+                                                                ));
+                                                            }
+                                                            Err(e) => {
+                                                                let resp = WsMessage::error_response(request_id, &e);
+                                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                    serde_json::to_string(&resp).unwrap()
+                                                                ));
+                                                            }
+                                                        }
+                                                    }
+                                                } else {
+                                                    let resp = WsMessage::error_response(request_id, "Not authenticated");
+                                                    let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                        serde_json::to_string(&resp).unwrap()
+                                                    ));
+                                                }
+                                            }
+                                        }
+
+                                        // MESSAGES
+                                        "get_room_messages" => {
+                                            if let Some(room_id) = client_msg.room_id {
+                                                match handle_get_room_messages(room_id).await {
+                                                    Ok(messages) => {
+                                                        let resp = WsMessage::success_response(request_id, json!({ "messages": messages, "room_id": room_id }));
+                                                        let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                            serde_json::to_string(&resp).unwrap()
+                                                        ));
+                                                    }
+                                                    Err(e) => {
+                                                        let resp = WsMessage::error_response(request_id, &e);
+                                                        let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                            serde_json::to_string(&resp).unwrap()
+                                                        ));
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        "send_message" => {
+                                            if let (Some(uid), Some(uname), Some(data)) = (current_user_id, current_username, client_msg.data) {
+                                                if uid > 0 {
+                                                    if let (Some(room_id), Some(content)) = (
+                                                        data.get("room_id").and_then(|v| v.as_i64()),
+                                                        data.get("content").and_then(|v| v.as_str())
+                                                    ) {
+                                                        match handle_send_message(uid, &uname, room_id as i32, content, manager.clone()).await {
+                                                            Ok(message) => {
+                                                                let resp = WsMessage::success_response(request_id, json!({ "message": message }));
+                                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                    serde_json::to_string(&resp).unwrap()
+                                                                ));
+                                                            }
+                                                            Err(e) => {
+                                                                let resp = WsMessage::error_response(request_id, &e);
+                                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                    serde_json::to_string(&resp).unwrap()
+                                                                ));
+                                                            }
+                                                        }
+                                                    }
+                                                } else {
+                                                    let resp = WsMessage::error_response(request_id, "Not authenticated");
+                                                    let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                        serde_json::to_string(&resp).unwrap()
+                                                    ));
+                                                }
+                                            }
+                                        }
+
+                                        // SUBSCRIPTIONS
                                         "subscribe_room" => {
                                             if let Some(room_id) = client_msg.room_id {
                                                 manager.subscribe_room(room_id, &connection_id).await;
                                                 println!("Client {} subscribed to room {}", connection_id, room_id);
                                             }
                                         }
+
                                         "unsubscribe_room" => {
                                             if let Some(room_id) = client_msg.room_id {
                                                 manager.unsubscribe_room(room_id, &connection_id).await;
                                                 println!("Client {} unsubscribed from room {}", connection_id, room_id);
                                             }
                                         }
+
                                         "subscribe_guild" => {
                                             if let Some(guild_id) = client_msg.guild_id {
                                                 manager.subscribe_guild(guild_id, &connection_id).await;
                                                 println!("Client {} subscribed to guild {}", connection_id, guild_id);
                                             }
                                         }
+
                                         "unsubscribe_guild" => {
                                             if let Some(guild_id) = client_msg.guild_id {
                                                 manager.unsubscribe_guild(guild_id, &connection_id).await;
                                                 println!("Client {} unsubscribed from guild {}", connection_id, guild_id);
                                             }
                                         }
-                                        "send_message" => {
-                                            if let Some(data) = client_msg.data {
-                                                handle_send_message(&data, manager.clone(), &pool).await;
-                                            }
-                                        }
+
                                         _ => {
                                             println!("Unknown message type: {}", client_msg.message_type);
+                                            let resp = WsMessage::error_response(request_id, &format!("Unknown message type: {}", client_msg.message_type));
+                                            let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                serde_json::to_string(&resp).unwrap()
+                                            ));
                                         }
                                     }
+                                } else {
+                                    println!("Failed to parse message: {}", text);
                                 }
                             }
                         }
@@ -371,13 +469,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                 }
-                
+
                 println!("Client {} disconnected", connection_id);
                 manager.remove_connection(&connection_id).await;
                 write_task.abort();
             }
         });
     }
-    
+
     Ok(())
 }

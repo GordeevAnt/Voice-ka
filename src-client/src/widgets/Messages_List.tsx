@@ -1,7 +1,7 @@
 // widgets/Messages_List.tsx
 import { useEffect, useState, useCallback, memo, useRef } from "react";
 import "./Messages_List.css";
-import { invoke } from "@tauri-apps/api/core";
+import { apiService } from "../features/api.service";
 import { Message } from "../entities/Message";
 
 interface MessageType {
@@ -20,8 +20,7 @@ interface MessageType {
 interface MessagesListProps {
     roomId: number;
     currentUserId?: number;
-    onNewMessage?: (message: MessageType) => void;
-    wsMessage?: any | null; // Изменяем тип на any
+    wsMessage?: any | null;
 }
 
 export const Messages_List = memo(({ roomId, currentUserId, wsMessage }: MessagesListProps) => {
@@ -37,7 +36,7 @@ export const Messages_List = memo(({ roomId, currentUserId, wsMessage }: Message
         setError(null);
         
         try {
-            const fetchedMessages = await invoke<MessageType[]>("get_room_messages", { roomId });
+            const fetchedMessages = await apiService.getRoomMessages(roomId);
             setMessages(fetchedMessages);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Ошибка загрузки сообщений");
@@ -51,26 +50,20 @@ export const Messages_List = memo(({ roomId, currentUserId, wsMessage }: Message
         loadMessages();
     }, [loadMessages]);
 
-    // Добавляем новое сообщение из WebSocket
     useEffect(() => {
         if (!wsMessage) return;
         
-        // Проверяем структуру сообщения
         const messageData = wsMessage.data || wsMessage;
-        
-        // Проверяем, что сообщение для этой комнаты
         const messageRoomId = messageData.room_id || wsMessage.room_id;
+        
         if (messageRoomId !== roomId) return;
         
         setMessages(prev => {
-            // Проверяем, нет ли уже такого сообщения по ID
             const messageId = messageData.id;
-            if (messageId) {
-                const exists = prev.some(msg => msg.id === messageId);
-                if (exists) return prev;
+            if (messageId && prev.some(msg => msg.id === messageId)) {
+                return prev;
             }
             
-            // Добавляем новое сообщение
             const newMessage: MessageType = {
                 id: messageData.id || Date.now(),
                 room_id: messageData.room_id || roomId,
@@ -100,7 +93,6 @@ export const Messages_List = memo(({ roomId, currentUserId, wsMessage }: Message
         }
     }, [loading, messages.length]);
 
-    // Scroll when new message arrives
     useEffect(() => {
         if (wsMessage) {
             scrollToBottom();

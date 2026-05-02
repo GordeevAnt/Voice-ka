@@ -1,4 +1,4 @@
-// src-tauri/src/ws/manager.rs
+// src-server/src/ws/manager.rs
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::{Mutex, broadcast};
@@ -6,10 +6,18 @@ use crate::ws::messages::WsMessage;
 
 type ConnectionId = String;
 
+#[derive(Clone)]
+pub struct ConnectionInfo {
+    pub user_id: i32,
+    pub username: String,
+    pub session_token: String,
+}
+
 pub struct SubscriptionManager {
     room_subscriptions: Arc<Mutex<HashMap<i32, HashSet<ConnectionId>>>>,
     guild_subscriptions: Arc<Mutex<HashMap<i32, HashSet<ConnectionId>>>>,
     connections: Arc<Mutex<HashMap<ConnectionId, broadcast::Sender<WsMessage>>>>,
+    connection_info: Arc<Mutex<HashMap<ConnectionId, ConnectionInfo>>>,
 }
 
 impl SubscriptionManager {
@@ -18,20 +26,28 @@ impl SubscriptionManager {
             room_subscriptions: Arc::new(Mutex::new(HashMap::new())),
             guild_subscriptions: Arc::new(Mutex::new(HashMap::new())),
             connections: Arc::new(Mutex::new(HashMap::new())),
+            connection_info: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
-    pub async fn add_connection(&self, connection_id: ConnectionId) -> broadcast::Receiver<WsMessage> {
+    pub async fn add_connection(
+        &self, 
+        connection_id: ConnectionId, 
+        info: ConnectionInfo
+    ) -> broadcast::Receiver<WsMessage> {
         let (tx, rx) = broadcast::channel(100);
-        self.connections.lock().await.insert(connection_id, tx);
+        self.connections.lock().await.insert(connection_id.clone(), tx);
+        self.connection_info.lock().await.insert(connection_id, info);
         rx
     }
 
     pub async fn remove_connection(&self, connection_id: &str) {
         let mut connections = self.connections.lock().await;
         connections.remove(connection_id);
+        
+        let mut conn_info = self.connection_info.lock().await;
+        conn_info.remove(connection_id);
 
-        // Clean up subscriptions
         let mut rooms = self.room_subscriptions.lock().await;
         for (_, conns) in rooms.iter_mut() {
             conns.remove(connection_id);
@@ -41,6 +57,37 @@ impl SubscriptionManager {
         for (_, conns) in guilds.iter_mut() {
             conns.remove(connection_id);
         }
+    }
+    
+    // Обновление информации о соединении после аутентификации
+    pub async fn update_connection_info(&self, connection_id: &str, info: ConnectionInfo) {
+        let mut conn_info = self.connection_info.lock().await;
+        conn_info.insert(connection_id.to_string(), info);
+    }
+    
+    // Очистка информации о соединении при выходе
+    pub async fn clear_connection_info(&self, connection_id: &str) {
+        let mut conn_info = self.connection_info.lock().await;
+        if let Some(info) = conn_info.get_mut(connection_id) {
+            info.user_id = 0;
+            info.username = "anonymous".to_string();
+        }
+    }
+    
+    pub async fn get_user_id(&self, connection_id: &str) -> Option<i32> {
+        self.connection_info
+            .lock()
+            .await
+            .get(connection_id)
+            .map(|info| info.user_id)
+    }
+    
+    pub async fn get_username(&self, connection_id: &str) -> Option<String> {
+        self.connection_info
+            .lock()
+            .await
+            .get(connection_id)
+            .map(|info| info.username.clone())
     }
 
     pub async fn subscribe_room(&self, room_id: i32, connection_id: &str) {
@@ -74,7 +121,7 @@ impl SubscriptionManager {
     }
     
     pub async fn broadcast_to_room(&self, room_id: i32, message: WsMessage) {
-        let message = message.with_room(room_id); // Убираем mut
+        let message = message.with_room(room_id);
         let rooms = self.room_subscriptions.lock().await;
         let connections = self.connections.lock().await;
 
@@ -88,7 +135,7 @@ impl SubscriptionManager {
     }
 
     pub async fn broadcast_to_guild(&self, guild_id: i32, message: WsMessage) {
-        let message = message.with_guild(guild_id); // Убираем mut
+        let message = message.with_guild(guild_id);
         let guilds = self.guild_subscriptions.lock().await;
         let connections = self.connections.lock().await;
 
@@ -98,13 +145,6 @@ impl SubscriptionManager {
                     let _ = sender.send(message.clone());
                 }
             }
-        }
-    }
-
-    pub async fn send_to_user(&self, connection_id: &str, message: WsMessage) {
-        let connections = self.connections.lock().await;
-        if let Some(sender) = connections.get(connection_id) {
-            let _ = sender.send(message);
         }
     }
 }

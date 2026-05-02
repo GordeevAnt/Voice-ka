@@ -1,0 +1,271 @@
+// src/features/websocket.service.ts
+import { storeAPI } from './useStore';
+
+type MessageHandler = (data: any) => void;
+
+interface Request {
+    id: string;
+    type: string;
+    resolve: (value: any) => void;
+    reject: (reason: any) => void;
+}
+
+class WebSocketService {
+    private ws: WebSocket | null = null;
+    private isConnected = false;
+    private isAuthenticated = false;
+    private reconnectAttempts = 0;
+    private maxReconnectAttempts = 10;
+    private reconnectDelay = 1000;
+    private pendingRequests = new Map<string, Request>();
+    private eventHandlers = new Map<string, Set<MessageHandler>>();
+    private connectionListeners = new Set<(connected: boolean) => void>();
+    private sessionToken: string | null = null;
+    private userId: number | null = null;
+
+    constructor() {
+        this.init();
+    }
+
+    private async init() {
+        this.sessionToken = await storeAPI.get<string>('session_id');
+        this.userId = await storeAPI.get<number>('user_id');
+        this.connect();
+    }
+
+    private connect() {
+        if (this.ws?.readyState === WebSocket.OPEN || 
+            this.ws?.readyState === WebSocket.CONNECTING) {
+            return;
+        }
+
+        console.log('🔌 Connecting to WebSocket...');
+        this.ws = new WebSocket('ws://127.0.0.1:9001');
+
+        this.ws.onopen = () => {
+            console.log('🟢 WebSocket connected');
+            this.isConnected = true;
+            this.reconnectAttempts = 0;
+            this.reconnectDelay = 1000;
+            this.notifyConnectionListeners();
+
+            // Если есть сохраненный токен, отправляем аутентификацию
+            if (this.sessionToken) {
+                console.log('🔐 Sending auth with existing token...');
+                this.authenticate(this.sessionToken, this.userId!);
+            }
+        };
+
+        this.ws.onmessage = (event) => {
+            try {
+                const message = JSON.parse(event.data);
+                this.handleMessage(message);
+            } catch (err) {
+                console.error('Failed to parse message:', err);
+            }
+        };
+
+        this.ws.onclose = (event) => {
+            console.log(`🔴 WebSocket disconnected (code: ${event.code})`);
+            this.isConnected = false;
+            this.isAuthenticated = false;
+            this.notifyConnectionListeners();
+            
+            if (event.code !== 1000 && event.code !== 1001) {
+                this.handleReconnect();
+            }
+        };
+
+        this.ws.onerror = (error) => {
+            console.error('WebSocket error:', error);
+        };
+    }
+
+    private handleReconnect() {
+        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+            console.error('Max reconnection attempts reached');
+            return;
+        }
+
+        this.reconnectAttempts++;
+        const delay = Math.min(this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1), 30000);
+        
+        console.log(`🔄 Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
+        
+        setTimeout(() => {
+            this.connect();
+        }, delay);
+    }
+
+    private async handleMessage(message: any) {
+        // Обработка ответов на запросы
+        if (message.request_id && this.pendingRequests.has(message.request_id)) {
+            const request = this.pendingRequests.get(message.request_id)!;
+            this.pendingRequests.delete(message.request_id);
+            
+            if (message.success) {
+                request.resolve(message.data);
+            } else {
+                request.reject(new Error(message.error || 'Request failed'));
+            }
+            return;
+        }
+
+        // Обработка событий (broadcast)
+        if (message.type && this.eventHandlers.has(message.type)) {
+            const handlers = this.eventHandlers.get(message.type)!;
+            handlers.forEach(handler => handler(message.data));
+        }
+    }
+
+    async request(type: string, data?: any, options?: { room_id?: number; guild_id?: number }): Promise<any> {
+        if (!this.isConnected) {
+            await new Promise<void>((resolve) => {
+                const unsubscribe = this.onConnectionChange((connected) => {
+                    if (connected) {
+                        unsubscribe();
+                        resolve();
+                    }
+                });
+                setTimeout(() => {
+                    unsubscribe();
+                    resolve();
+                }, 5000);
+            });
+        }
+        
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            throw new Error('WebSocket is not connected');
+        }
+
+        const requestId = this.generateRequestId();
+        
+        const payload: any = {
+            type,
+            request_id: requestId,
+        };
+        
+        if (data) payload.data = data;
+        if (options?.room_id) payload.room_id = options.room_id;
+        if (options?.guild_id) payload.guild_id = options.guild_id;
+        
+        return new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                if (this.pendingRequests.has(requestId)) {
+                    this.pendingRequests.delete(requestId);
+                    reject(new Error('Request timeout'));
+                }
+            }, 30000);
+            
+            this.pendingRequests.set(requestId, { 
+                id: requestId, 
+                type, 
+                resolve: (value) => {
+                    clearTimeout(timeout);
+                    resolve(value);
+                }, 
+                reject: (reason) => {
+                    clearTimeout(timeout);
+                    reject(reason);
+                }
+            });
+            
+            this.ws!.send(JSON.stringify(payload));
+        });
+    }
+
+    async authenticate(token: string, userId: number): Promise<void> {
+        this.sessionToken = token;
+        this.userId = userId;
+        
+        await storeAPI.set('session_id', token);
+        await storeAPI.set('user_id', userId);
+        await storeAPI.set('token', 'true');
+        
+        try {
+            const result = await this.request('auth', { session_token: token });
+            if (result.success) {
+                this.isAuthenticated = true;
+                console.log('✅ Authenticated successfully');
+            }
+        } catch (err) {
+            console.error('Authentication failed:', err);
+            throw err;
+        }
+    }
+
+    notify(type: string, data?: any, options?: { room_id?: number; guild_id?: number }) {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            console.warn('WebSocket not connected, cannot send notification');
+            return;
+        }
+
+        const payload: any = { type };
+        if (data) payload.data = data;
+        if (options?.room_id) payload.room_id = options.room_id;
+        if (options?.guild_id) payload.guild_id = options.guild_id;
+        
+        this.ws.send(JSON.stringify(payload));
+    }
+
+    on(eventType: string, handler: MessageHandler): () => void {
+        if (!this.eventHandlers.has(eventType)) {
+            this.eventHandlers.set(eventType, new Set());
+        }
+        this.eventHandlers.get(eventType)!.add(handler);
+        
+        return () => {
+            this.eventHandlers.get(eventType)?.delete(handler);
+        };
+    }
+
+    subscribeRoom(roomId: number) {
+        this.notify('subscribe_room', undefined, { room_id: roomId });
+    }
+
+    unsubscribeRoom(roomId: number) {
+        this.notify('unsubscribe_room', undefined, { room_id: roomId });
+    }
+
+    subscribeGuild(guildId: number) {
+        this.notify('subscribe_guild', undefined, { guild_id: guildId });
+    }
+
+    unsubscribeGuild(guildId: number) {
+        this.notify('unsubscribe_guild', undefined, { guild_id: guildId });
+    }
+
+    getConnectionStatus(): boolean {
+        return this.isConnected;
+    }
+
+    getAuthStatus(): boolean {
+        return this.isAuthenticated;
+    }
+
+    onConnectionChange(listener: (connected: boolean) => void): () => void {
+        this.connectionListeners.add(listener);
+        return () => {
+            this.connectionListeners.delete(listener);
+        };
+    }
+
+    private notifyConnectionListeners() {
+        this.connectionListeners.forEach(listener => listener(this.isConnected));
+    }
+
+    private generateRequestId(): string {
+        return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    }
+
+    disconnect() {
+        if (this.ws) {
+            this.ws.close(1000, 'Normal closure');
+            this.ws = null;
+        }
+        this.isConnected = false;
+        this.isAuthenticated = false;
+    }
+}
+
+export const wsService = new WebSocketService();

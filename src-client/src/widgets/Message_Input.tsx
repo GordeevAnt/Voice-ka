@@ -1,49 +1,23 @@
 // widgets/Message_Input.tsx
 import { useState, useRef } from "react";
-import { storeAPI } from "../features/useStore";
+import { apiService } from "../features/api.service";
 import "./Message_Input.css";
 
 interface MessageInputProps {
     roomId: number;
-    wsRef?: React.MutableRefObject<WebSocket | null>;
 }
 
-export function Message_Input({ roomId, wsRef }: MessageInputProps) {
+export function Message_Input({ roomId }: MessageInputProps) {
     const [content, setContent] = useState("");
     const [isSending, setIsSending] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
 
     const handleSend = async () => {
         if (!content.trim() || isSending) return;
-        if (!wsRef?.current || wsRef.current.readyState !== WebSocket.OPEN) {
-            console.error('WebSocket не подключен');
-            alert('Нет подключения к серверу. Попробуйте обновить страницу.');
-            return;
-        }
 
         setIsSending(true);
         try {
-            const sessionId = await storeAPI.get<string>('session_id');
-            
-            if (!sessionId) {
-                alert('Сессия не найдена. Пожалуйста, перезайдите в систему.');
-                return;
-            }
-            
-            // Отправляем через WebSocket
-            const message = {
-                type: 'send_message',
-                room_id: roomId,
-                data: {
-                    room_id: roomId,
-                    content: content.trim(),
-                    session_id: sessionId
-                }
-            };
-            
-            console.log('Отправка сообщения:', message);
-            wsRef.current.send(JSON.stringify(message));
-            
+            await apiService.sendMessage(roomId, content.trim());
             setContent("");
             inputRef.current?.focus();
         } catch (err) {

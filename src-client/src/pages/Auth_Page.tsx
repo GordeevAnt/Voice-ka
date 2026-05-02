@@ -1,36 +1,11 @@
-// Auth_Page.tsx - исправленная версия
+// Auth_Page.tsx
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { invoke } from "@tauri-apps/api/core";
 import { storeAPI } from "../features/useStore";
+import { apiService } from "../features/api.service";
+import { wsService } from "../features/websocket.service";
 
 import "./Auth_Page.css"
-
-const setAuth = async (userId: number, sessionId: string) => {
-    try {
-        await storeAPI.set('token', "true");
-        await storeAPI.set('user_id', userId.toString());
-        await storeAPI.set('session_id', sessionId);
-        
-        // Проверяем, что данные сохранились
-        const savedToken = await storeAPI.get('token');
-        const savedUserId = await storeAPI.get('user_id');
-        const savedSessionId = await storeAPI.get('session_id');
-        
-        console.log('Auth data saved successfully:', { 
-            userId: savedUserId, 
-            sessionId: savedSessionId,
-            token: savedToken 
-        });
-    } catch (error) {
-        console.error('Failed to save auth data:', error);
-        throw error;
-    }
-}
-
-function WrongData() {
-    return <div className="wrong-active">Неверные данные</div>
-}
 
 export function Auth_Page() {
     const navigate = useNavigate();
@@ -38,19 +13,36 @@ export function Auth_Page() {
     const [passwordValue, setPassValue] = useState("");
     const [wrong, setWrong] = useState(0);
     const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
 
-    // Проверяем, не авторизован ли уже пользователь
     useEffect(() => {
         const checkAuth = async () => {
             try {
                 const token = await storeAPI.get('token');
                 const userId = await storeAPI.get('user_id');
+                const sessionId = await storeAPI.get('session_id');
                 
-                console.log('Checking existing auth:', { token, userId });
+                console.log('Checking existing auth:', { token, userId, sessionId });
                 
-                if (token && userId) {
-                    console.log('User already authenticated, redirecting...');
+                if (token && userId && sessionId) {
+                    // Ждем подключения WebSocket
+                    if (!wsService.getConnectionStatus()) {
+                        await new Promise<void>((resolve) => {
+                            const unsubscribe = wsService.onConnectionChange((connected) => {
+                                if (connected) {
+                                    unsubscribe();
+                                    resolve();
+                                }
+                            });
+                        });
+                    }
+                    
+                    // Аутентифицируемся на существующем соединении
+                    await wsService.authenticate(sessionId as string, parseInt(userId as string));
+                    
+                    console.log('WebSocket authenticated, redirecting...');
                     navigate('/main', { replace: true });
+                    return;
                 }
             } catch (error) {
                 console.error('Error checking auth:', error);
@@ -58,7 +50,11 @@ export function Auth_Page() {
                 setIsCheckingAuth(false);
             }
         };
-        checkAuth();
+        
+        // Даем WebSocket время на подключение
+        setTimeout(() => {
+            checkAuth();
+        }, 500);
     }, [navigate]);
 
     const handleLoginChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -72,40 +68,41 @@ export function Auth_Page() {
     const handleLogin = async () => {
         try {
             setWrong(0);
+            setIsLoading(true);
             console.log('🔑 Attempting login with:', loginValue);
             
-            const result = await invoke("login", { 
-                login: loginValue, 
-                password: passwordValue,
-                ipAddress: null,
-                userAgent: navigator.userAgent
-            });
+            // Ждем подключения WebSocket если его нет
+            if (!wsService.getConnectionStatus()) {
+                console.log('Waiting for WebSocket connection...');
+                await new Promise<void>((resolve) => {
+                    const unsubscribe = wsService.onConnectionChange((connected) => {
+                        if (connected) {
+                            unsubscribe();
+                            resolve();
+                        }
+                    });
+                });
+            }
             
-            console.log('📥 Raw result:', result);
-            console.log('📥 Result type:', typeof result);
+            const [success, userId, sessionId] = await apiService.login(
+                loginValue, 
+                passwordValue, 
+                null, 
+                navigator.userAgent
+            );
             
-            // Tauri возвращает кортеж как массив
-            if (Array.isArray(result) && result.length >= 3) {
-                const [success, userId, sessionId] = result;
-                
-                console.log('📊 Parsed result:', { success, userId, sessionId });
-                
-                if (success === true && userId > 0 && sessionId) {
-                    console.log('✅ Login successful, saving auth data...');
-                    await setAuth(userId, sessionId);
-                    console.log('🚀 Redirecting to main page...');
-                    navigate('/main', { replace: true });
-                } else {
-                    console.log('❌ Login failed: invalid credentials');
-                    setWrong(1);
-                }
+            if (success) {
+                console.log('✅ Login successful, redirecting...');
+                navigate('/main', { replace: true });
             } else {
-                console.error('❌ Unexpected result format:', result);
+                console.log('❌ Login failed');
                 setWrong(1);
+                setIsLoading(false);
             }
         } catch (error) {
             console.error("❌ Login error:", error);
             setWrong(1);
+            setIsLoading(false);
         }
     };
 
@@ -121,12 +118,13 @@ export function Auth_Page() {
         <div className="auth-page-container">
             <p className="auth-greet">Приветствуем Вас!</p>
             <div className="auth-form">
-                {wrong === 1 && <WrongData />}
+                {wrong === 1 && <div className="wrong-active">Неверные данные</div>}
                 <input 
                     className="login" 
                     placeholder="Логин" 
                     onChange={handleLoginChange} 
                     value={loginValue}
+                    disabled={isLoading}
                 />
                 <input 
                     className="password" 
@@ -134,14 +132,23 @@ export function Auth_Page() {
                     type="password"
                     onChange={handlePasswordChange} 
                     value={passwordValue}
+                    disabled={isLoading}
                 />
 
                 <div className="auth-buttons">
-                    <button className="auth-form-btn auth" onClick={handleLogin}>
-                        Войти
+                    <button 
+                        className="auth-form-btn auth" 
+                        onClick={handleLogin}
+                        disabled={isLoading}
+                    >
+                        {isLoading ? "Вход..." : "Войти"}
                     </button>
 
-                    <button className="auth-form-btn reg" onClick={handleRegister}>
+                    <button 
+                        className="auth-form-btn reg" 
+                        onClick={handleRegister}
+                        disabled={isLoading}
+                    >
                         Зарегистрироваться
                     </button>
                 </div>

@@ -1,11 +1,12 @@
+// Chanels_List.tsx
 import { useState, useEffect } from "react";
 import { Switch_Chanel_Button } from "../shared/Switch_Chanel_Button";
-import { invoke } from "@tauri-apps/api/core";
+import { apiService } from "../features/api.service";
+import { storeAPI } from "../features/useStore";
+import { wsService } from "../features/websocket.service";
 import "./Chanels_List.css";
 import { Search_Chanel } from "../shared/Search_Chanel";
-import { storeAPI } from "../features/useStore";
 
-// Интерфейс канала
 interface Guild {
     id: number;
     name: string;
@@ -19,7 +20,6 @@ interface ChanelsListProps {
     onGuildSelect: (guildId: number) => void;
 }
 
-// Виджет вывода списка комнат канала
 export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps) {
     const [guilds, setGuilds] = useState<Guild[]>([]);
     const [loading, setLoading] = useState(true);
@@ -29,22 +29,15 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
     const [isCreating, setIsCreating] = useState(false);
 
     const getIcon = (icon: string | null) => {
-        if (!icon) {
-            return "/voice-ka.svg";
-        }
-        
-        if (icon.startsWith('/')) {
-            return icon;
-        }
-        
+        if (!icon) return "/voice-ka.svg";
+        if (icon.startsWith('/')) return icon;
         return `/icons/${icon}`;
     };
 
-    // Загрузка каналов пользователя
     const fetchGuilds = async () => {
         try {
             setLoading(true);
-            const userId = await storeAPI.get<string>('user_id');
+            const userId = await storeAPI.get<number>('user_id');
             
             if (!userId) {
                 console.error("Пользователь не авторизован");
@@ -52,10 +45,7 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
                 return;
             }
             
-            const guildsData = await invoke<Guild[]>("get_user_guilds", { 
-                userId: parseInt(userId) 
-            });
-            
+            const guildsData = await apiService.getUserGuilds(userId);
             console.log('📋 Loaded guilds:', guildsData);
             setGuilds(guildsData);
         } catch (err) {
@@ -67,10 +57,23 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
 
     useEffect(() => {
         fetchGuilds();
+        
+        // Подписываемся на события создания/обновления гильдий
+        const unsubscribeGuildCreated = wsService.on('guild_created', (guild) => {
+            console.log('🆕 New guild created via WS:', guild);
+            setGuilds(prev => {
+                const exists = prev.some(g => g.id === guild.id);
+                if (exists) return prev;
+                return [...prev, guild];
+            });
+        });
+        
+        return () => {
+            unsubscribeGuildCreated();
+        };
     }, []);
 
     const handleGuildJoined = () => {
-        // Обновляем список каналов после присоединения
         fetchGuilds();
     };
 
@@ -85,7 +88,7 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
             return;
         }
 
-        const userId = await storeAPI.get<string>('user_id');
+        const userId = await storeAPI.get<number>('user_id');
         if (!userId) {
             alert("Пользователь не авторизован");
             return;
@@ -93,24 +96,18 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
 
         setIsCreating(true);
         try {
-            const newGuild = await invoke<Guild>("create_guild", {
-                guildData: {
-                    name: newGuildName.trim(),
-                    description: newGuildDescription.trim() || null,
-                    owner_id: parseInt(userId),
-                    icon: null
-                }
+            const newGuild = await apiService.createGuild({
+                name: newGuildName.trim(),
+                description: newGuildDescription.trim() || null,
+                owner_id: userId,
+                icon: null
             });
 
-            // Обновляем список гильдий
             await fetchGuilds();
-            
-            // Закрываем модальное окно
             setShowCreateModal(false);
             setNewGuildName("");
             setNewGuildDescription("");
             
-            // Автоматически выбираем новую гильдию
             if (newGuild && newGuild.id) {
                 console.log(`🆕 New guild created, switching to: ${newGuild.id}`);
                 onGuildSelect(newGuild.id);
@@ -142,7 +139,6 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
             </button>
             <div className="chanel-list-block">
                 <div className="chanel-list">
-                    
                     {guilds.map((guild) => (
                         <Switch_Chanel_Button
                             key={guild.id}

@@ -1,26 +1,20 @@
-// Logout.tsx - с правильной очисткой и уведомлением
-import { invoke } from "@tauri-apps/api/core";
+// Logout.tsx
 import { useNavigate } from "react-router-dom";
 import { storeAPI } from "../features/useStore";
+import { apiService } from "../features/api.service";
 
 export function Logout() {
     const navigate = useNavigate();
     
     const handleLogout = async () => {
         try {
-            const userId = await storeAPI.get('user_id');
-            const sessionId = await storeAPI.get('session_id');
+            const userId = await storeAPI.get<number>('user_id');
+            const sessionId = await storeAPI.get<string>('session_id');
             
             console.log('Logout: User data', { userId, sessionId });
             
             if (userId) {
-                // Вызываем logout с WebSocket менеджером
-                const result = await invoke('logout', { 
-                    userId: parseInt(userId as string),
-                    sessionId: sessionId || null
-                });
-                
-                console.log('Logout result:', result);
+                await apiService.logout(userId, sessionId || null);
             }
             
             // Очищаем хранилище

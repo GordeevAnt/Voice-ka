@@ -1,5 +1,6 @@
+// Search_Chanel.tsx
 import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { apiService } from "../features/api.service";
 import { storeAPI } from "../features/useStore";
 import "./Search_Chanel.css";
 
@@ -40,10 +41,8 @@ export function Search_Chanel({ onGuildJoined }: SearchChanelProps) {
         setFoundGuild(null);
 
         try {
-            const guild = await invoke<GuildInfo | null>("find_guild_by_id", { 
-                guildId: id 
-            });
-
+            const guild = await apiService.findGuildById(id);
+            
             if (guild) {
                 setFoundGuild(guild);
             } else {
@@ -60,8 +59,7 @@ export function Search_Chanel({ onGuildJoined }: SearchChanelProps) {
     const handleJoin = async () => {
         if (!foundGuild) return;
 
-        // Получаем user_id из storeAPI
-        const userId = await storeAPI.get<string>('user_id');
+        const userId = await storeAPI.get<number>('user_id');
         if (!userId) {
             setError("Пользователь не авторизован");
             return;
@@ -71,15 +69,14 @@ export function Search_Chanel({ onGuildJoined }: SearchChanelProps) {
         setError(null);
 
         try {
-            await invoke("join_guild_by_id", {
-                userId: parseInt(userId),
-                guildId: foundGuild.id
-            });
-
-            // Вызываем колбэк для обновления списка каналов
-            onGuildJoined?.();
-            handleCloseModal();
+            const success = await apiService.joinGuild(userId, foundGuild.id);
             
+            if (success) {
+                onGuildJoined?.();
+                handleCloseModal();
+            } else {
+                setError("Не удалось присоединиться к каналу");
+            }
         } catch (err) {
             setError(`Ошибка присоединения: ${err}`);
             console.error("Ошибка присоединения к каналу:", err);

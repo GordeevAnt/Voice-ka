@@ -9,7 +9,7 @@ static DB_POOL: OnceLock<PgPool> = OnceLock::new();
 /// Выполняет миграции из SQL-файла
 async fn run_migration_script(pool: &PgPool) -> Result<(), Box<dyn std::error::Error>> {
     // Читаем SQL-файл миграции
-    let migration_sql = include_str!("../../../migrations/001_initial_schema.sql");
+    let migration_sql = include_str!("../../migrations/001_initial_schema.sql");
     
     println!("🔄 Выполнение миграций базы данных...");
     
@@ -623,12 +623,17 @@ pub async fn connect_database() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-// Возвращаем Option вместо паники
-pub fn get_db_pool() -> Option<&'static PgPool> {
-    DB_POOL.get()
+/// Получение пула (ПРЯМО, без Option)
+pub fn get_db_pool() -> &'static PgPool {
+    DB_POOL.get().expect("База данных не подключена. Вызовите connect_database() или init_database() сначала")
 }
 
-// Для удобства - вызывает панику, если БД не подключена
-pub fn get_db_pool_unchecked() -> &'static PgPool {
-    DB_POOL.get().expect("База данных не подключена. Вызовите connect_database() сначала")
-}
+// /// Получение пула с Option (для обратной совместимости)
+// pub fn get_db_pool_opt() -> Option<&'static PgPool> {
+//     DB_POOL.get()
+// }
+
+// // Для удобства - вызывает панику, если БД не подключена
+// pub fn get_db_pool_unchecked() -> &'static PgPool {
+//     DB_POOL.get().expect("База данных не подключена. Вызовите connect_database() сначала")
+// }

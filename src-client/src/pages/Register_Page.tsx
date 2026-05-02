@@ -1,9 +1,9 @@
-// Register_Page.tsx - исправленная версия
+// Register_Page.tsx
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import "./Register_Page.css";
+import { apiService } from "../features/api.service";
 import { storeAPI } from "../features/useStore";
+import "./Register_Page.css";
 
 export function Register_Page() {
     const navigate = useNavigate();
@@ -48,67 +48,31 @@ export function Register_Page() {
         try {
             console.log('🔑 Attempting registration with:', { username, email });
             
-            const result = await invoke('register', { 
-                login: username,
-                email, 
-                password, 
-                confirmPassword 
-            });
+            const [success, userId] = await apiService.register(username, email, password, confirmPassword);
             
-            console.log('📥 Registration result:', result);
-            
-            if (Array.isArray(result) && result.length >= 2) {
-                const [success, userId] = result;
+            if (success && userId) {
+                console.log('✅ Registration successful, performing auto-login...');
                 
-                if (success === true && userId > 0) {
-                    console.log('✅ Registration successful, performing auto-login...');
-                    
-                    // После регистрации выполняем вход
-                    const loginResult = await invoke('login', { 
-                        login: username, 
-                        password: password,
-                        ipAddress: null,
-                        userAgent: navigator.userAgent
-                    });
-                    
-                    console.log('📥 Login result:', loginResult);
-                    
-                    if (Array.isArray(loginResult) && loginResult.length >= 3) {
-                        const [loginSuccess, loginUserId, sessionId] = loginResult;
-                        
-                        if (loginSuccess === true && sessionId) {
-                            // Сохраняем все данные
-                            await storeAPI.set('token', "true");
-                            await storeAPI.set('user_id', loginUserId.toString());
-                            await storeAPI.set('session_id', sessionId);
-                            
-                            // Проверяем сохранение
-                            const savedToken = await storeAPI.get('token');
-                            const savedUserId = await storeAPI.get('user_id');
-                            const savedSessionId = await storeAPI.get('session_id');
-                            
-                            console.log('✅ Auth data saved:', { 
-                                token: savedToken,
-                                userId: savedUserId, 
-                                sessionId: savedSessionId 
-                            });
-                            
-                            navigate('/main', { replace: true });
-                        } else {
-                            setErrorMessage("Ошибка входа после регистрации");
-                        }
-                    } else {
-                        // Если логин не сработал, все равно пробуем перейти
-                        console.warn('⚠️ Auto-login failed, redirecting to login page');
-                        await storeAPI.set('token', "true");
-                        await storeAPI.set('user_id', userId.toString());
-                        navigate('/main', { replace: true });
-                    }
+                // Автоматический вход после регистрации
+                const [loginSuccess, loginUserId, sessionId] = await apiService.login(
+                    username, 
+                    password, 
+                    null, 
+                    navigator.userAgent
+                );
+                
+                if (loginSuccess && sessionId) {
+                    console.log('✅ Auto-login successful');
+                    navigate('/main', { replace: true });
                 } else {
-                    setErrorMessage("Ошибка регистрации. Попробуйте другие данные.");
+                    // Если логин не сработал, все равно пробуем перейти
+                    console.warn('⚠️ Auto-login failed, but registration succeeded');
+                    await storeAPI.set('token', "true");
+                    await storeAPI.set('user_id', userId.toString());
+                    navigate('/main', { replace: true });
                 }
             } else {
-                setErrorMessage("Ошибка регистрации. Неверный формат ответа.");
+                setErrorMessage("Ошибка регистрации. Попробуйте другие данные.");
             }
         } catch (err: any) {
             console.error("❌ Registration error:", err);
