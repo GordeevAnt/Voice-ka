@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
-// src-server/src/handlers/auth.rs
 use crate::db::get_db_pool;
 use crate::ws::manager::{ConnectionInfo, SubscriptionManager};
-use crate::handlers::guild::{get_user_guilds_ids, notify_user_status_change};
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
@@ -12,6 +10,10 @@ use chrono::Utc;
 use serde_json::json;
 use sqlx::Row;
 use uuid::Uuid;
+
+// Импортируем функции из guild
+use crate::handlers::guild::get_user_guilds_ids;
+use crate::handlers::guild::handle_notify_user_status_change;
 
 #[derive(Debug, serde::Deserialize)]
 pub struct LoginData {
@@ -128,15 +130,14 @@ pub async fn handle_login(
         .map_err(|e| e.to_string())?;
     }
 
-    // КОММИТИМ ТРАНЗАКЦИЮ
     transaction.commit()
         .await
         .map_err(|e| e.to_string())?;
 
-    // После коммита - уведомляем пользователей (не в транзакции)
+    // После коммита - уведомляем пользователей
     let user_guilds = get_user_guilds_ids(user_id).await?;
     
-    notify_user_status_change(
+    handle_notify_user_status_change(
         &manager,
         user_id,
         &username,
@@ -154,6 +155,7 @@ pub async fn handle_login(
         username,
     })
 }
+
 
 #[derive(Debug, serde::Deserialize)]
 pub struct RegisterData {
@@ -425,7 +427,7 @@ pub async fn handle_logout(
     // Если нет других активных сессий, уведомляем об оффлайн статусе
     if active_sessions == 0 {
         if let Some(user) = user_info {
-            notify_user_status_change(
+            handle_notify_user_status_change(
                 &manager,
                 user_id,
                 &user.username,

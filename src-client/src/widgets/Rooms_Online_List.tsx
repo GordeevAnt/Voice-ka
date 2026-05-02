@@ -48,10 +48,23 @@ export function Rooms_Online_List({ guildId }: RoomsOnlineListProps) {
             setOnlineUsers(prev => prev.filter(u => u.user_id !== userId));
         });
         
+        const unsubscribeUserJoined = wsService.on('user_joined_guild', (user) => {
+            console.log('👋 User joined guild:', user);
+            if (user.status === 'online') {
+                setOnlineUsers(prev => {
+                    const exists = prev.find(u => u.user_id === user.user_id);
+                    if (exists) return prev;
+                    return [...prev, user];
+                });
+            }
+        });
+
+        // В return добавьте:
         return () => {
             unsubscribeStatus();
             unsubscribeOnline();
             unsubscribeOffline();
+            unsubscribeUserJoined();
         };
     }, [handleUserStatusChanged]);
 

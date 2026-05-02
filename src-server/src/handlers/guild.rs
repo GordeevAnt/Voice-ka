@@ -47,7 +47,7 @@ pub async fn handle_get_user_guilds(user_id: i32) -> Result<Vec<serde_json::Valu
     }).collect())
 }
 
-pub async fn notify_user_status_change(
+pub async fn handle_notify_user_status_change(
     manager: &Arc<SubscriptionManager>,
     user_id: i32,
     username: &str,
@@ -82,6 +82,8 @@ pub async fn get_user_guilds_ids(user_id: i32) -> Result<Vec<i32>, String> {
     
     Ok(guilds)
 }
+
+
 
 pub async fn handle_create_guild(
     user_id: i32,
@@ -247,7 +249,7 @@ pub async fn handle_join_guild(
     .await
     .map_err(|e| e.to_string())?;
 
-    // ✅ ИСПРАВЛЕНО: используем query вместо query! для Option типов
+    // Получаем информацию о пользователе
     let user_row = sqlx::query(
         "SELECT username, avatar, status FROM users WHERE id = $1"
     )
@@ -260,18 +262,29 @@ pub async fn handle_join_guild(
     let avatar: Option<String> = user_row.get(1);
     let status: String = user_row.get(2);
 
-    // Уведомляем всех в гильдии
-    let user_status = json!({
+    // Уведомляем всех в гильдии о присоединении
+    let user_joined_data = json!({
         "user_id": user_id,
         "username": username,
         "avatar": avatar,
         "status": status
     });
 
-    let ws_message = WsMessage::new("user_joined_guild", user_status)
+    let ws_joined_msg = WsMessage::new("user_joined_guild", user_joined_data)
         .with_guild(guild_id);
+    manager.broadcast_to_guild(guild_id, ws_joined_msg).await;
 
-    manager.broadcast_to_guild(guild_id, ws_message).await;
+    // Также уведомляем об изменении статуса (если пользователь онлайн)
+    if status == "online" {
+        handle_notify_user_status_change(
+            &manager,
+            user_id,
+            &username,
+            &avatar,
+            &status,
+            &[guild_id],
+        ).await;
+    }
 
     Ok(true)
 }
@@ -401,3 +414,5 @@ pub async fn handle_get_user_guilds_with_role(user_id: i32) -> Result<Vec<serde_
         })
     }).collect())
 }
+
+pub use get_user_guilds_ids as handle_get_user_guilds_ids;
