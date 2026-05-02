@@ -47,6 +47,42 @@ pub async fn handle_get_user_guilds(user_id: i32) -> Result<Vec<serde_json::Valu
     }).collect())
 }
 
+pub async fn notify_user_status_change(
+    manager: &Arc<SubscriptionManager>,
+    user_id: i32,
+    username: &str,
+    avatar: &Option<String>,
+    status: &str,
+    guild_ids: &[i32],
+) {
+    let status_data = json!({
+        "user_id": user_id,
+        "username": username,
+        "avatar": avatar,
+        "status": status
+    });
+    
+    for guild_id in guild_ids {
+        let ws_message = WsMessage::new("user_status_changed", status_data.clone())
+            .with_guild(*guild_id);
+        manager.broadcast_to_guild(*guild_id, ws_message).await;
+    }
+}
+
+pub async fn get_user_guilds_ids(user_id: i32) -> Result<Vec<i32>, String> {
+    let pool = get_db_pool();
+    
+    let guilds = sqlx::query_scalar(
+        "SELECT guild_id FROM guild_members WHERE user_id = $1"
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| format!("Failed to get user guilds: {}", e))?;
+    
+    Ok(guilds)
+}
+
 pub async fn handle_create_guild(
     user_id: i32,
     data: CreateGuildData,

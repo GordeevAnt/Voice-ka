@@ -18,6 +18,8 @@ use handlers::room::{
     CreateRoomData
 };
 
+use crate::handlers::{LoginData, handle_login, handle_logout};
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
@@ -142,8 +144,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                         // AUTH
                                         "login" => {
                                             if let Some(data) = client_msg.data {
-                                                if let Ok(login_data) = serde_json::from_value::<handlers::auth::LoginData>(data) {
-                                                    match handlers::auth::handle_login(login_data).await {
+                                                if let Ok(login_data) = serde_json::from_value::<LoginData>(data) {
+                                                    match handle_login(login_data, manager.clone()).await {
                                                         Ok(response) => {
                                                             let resp = WsMessage::success_response(request_id, serde_json::to_value(&response).unwrap());
                                                             let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
@@ -184,7 +186,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                                         "logout" => {
                                             if let Some(uid) = current_user_id {
-                                                match handlers::auth::handle_logout(uid, client_msg.session_token).await {
+                                                match handle_logout(uid, client_msg.session_token, manager.clone()).await {
                                                     Ok(_) => {
                                                         manager.clear_connection_info(&connection_id).await;
                                                         let resp = WsMessage::success_response(request_id, json!({ "success": true }));

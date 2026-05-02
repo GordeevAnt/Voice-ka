@@ -66,6 +66,7 @@ export function Rooms_Online_List({ guildId }: RoomsOnlineListProps) {
         const loadOnlineUsers = async () => {
             setLoading(true);
             try {
+                await wsService.waitForAuth();
                 const users = await apiService.getOnlineGuildMembers(guildId);
                 console.log('📋 Loaded online users:', users);
                 setOnlineUsers(users);

@@ -1,6 +1,9 @@
+use std::sync::Arc;
+
 // src-server/src/handlers/auth.rs
 use crate::db::get_db_pool;
-use crate::ws::manager::ConnectionInfo;
+use crate::ws::manager::{ConnectionInfo, SubscriptionManager};
+use crate::handlers::guild::{get_user_guilds_ids, notify_user_status_change};
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
@@ -26,7 +29,10 @@ pub struct LoginResponse {
     pub username: String,
 }
 
-pub async fn handle_login(data: LoginData) -> Result<LoginResponse, String> {
+pub async fn handle_login(
+    data: LoginData, 
+    manager: Arc<SubscriptionManager>
+) -> Result<LoginResponse, String> {
     let pool = get_db_pool();
 
     // Получаем пользователя
@@ -59,8 +65,8 @@ pub async fn handle_login(data: LoginData) -> Result<LoginResponse, String> {
     // Закрываем старые сессии
     sqlx::query!(
         "UPDATE websocket_sessions 
-         SET status = 'closed', disconnected_at = $1 
-         WHERE user_id = $2 AND status = 'active'",
+        SET status = 'closed', disconnected_at = $1 
+        WHERE user_id = $2 AND status = 'active'",
         Utc::now(),
         user_id
     )
@@ -82,7 +88,6 @@ pub async fn handle_login(data: LoginData) -> Result<LoginResponse, String> {
     let session_token = Uuid::new_v4().to_string();
     let now = Utc::now();
 
-    // 🔧 ИСПРАВЛЕНО: используем query вместо query! для Option типов
     sqlx::query(
         "INSERT INTO websocket_sessions (user_id, connection_id, status, ip_address, user_agent, last_heartbeat, connected_at)
         VALUES ($1, $2, 'active', $3::inet, $4, $5, $5)"
@@ -107,7 +112,6 @@ pub async fn handle_login(data: LoginData) -> Result<LoginResponse, String> {
     .map_err(|e| e.to_string())?;
 
     if let Some(guild_id) = user_guild_id {
-        // 🔧 ИСПРАВЛЕНО: используем query вместо query! для динамических значений
         let changes_str = json!({ "login": data.login }).to_string();
         
         sqlx::query(
@@ -124,9 +128,22 @@ pub async fn handle_login(data: LoginData) -> Result<LoginResponse, String> {
         .map_err(|e| e.to_string())?;
     }
 
+    // КОММИТИМ ТРАНЗАКЦИЮ
     transaction.commit()
         .await
         .map_err(|e| e.to_string())?;
+
+    // После коммита - уведомляем пользователей (не в транзакции)
+    let user_guilds = get_user_guilds_ids(user_id).await?;
+    
+    notify_user_status_change(
+        &manager,
+        user_id,
+        &username,
+        &None,
+        "online",
+        &user_guilds,
+    ).await;
 
     println!("✅ User {} (ID: {}) logged in", username, user_id);
 
@@ -332,13 +349,29 @@ pub async fn validate_session(session_token: &str) -> Option<ConnectionInfo> {
     })
 }
 
-pub async fn handle_logout(user_id: i32, session_token: Option<String>) -> Result<bool, String> {
+pub async fn handle_logout(
+    user_id: i32, 
+    session_token: Option<String>,
+    manager: Arc<SubscriptionManager>
+) -> Result<bool, String> {
     let pool = get_db_pool();
-
+    
+    // Получаем гильдии пользователя ДО того как он станет оффлайн
+    let user_guilds = get_user_guilds_ids(user_id).await?;
+    
+    // Получаем информацию о пользователе
+    let user_info = sqlx::query!(
+        "SELECT username, avatar FROM users WHERE id = $1",
+        user_id
+    )
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| e.to_string())?;
+    
     let mut transaction = pool.begin()
         .await
         .map_err(|e| e.to_string())?;
-
+    
     // Закрываем сессию
     if let Some(token) = session_token {
         sqlx::query!(
@@ -362,7 +395,7 @@ pub async fn handle_logout(user_id: i32, session_token: Option<String>) -> Resul
         .await
         .map_err(|e| e.to_string())?;
     }
-
+    
     // Проверяем другие активные сессии
     let active_sessions: i64 = sqlx::query_scalar!(
         "SELECT COUNT(*) FROM websocket_sessions WHERE user_id = $1 AND status = 'active'",
@@ -372,7 +405,7 @@ pub async fn handle_logout(user_id: i32, session_token: Option<String>) -> Resul
     .await
     .map_err(|e| e.to_string())?
     .unwrap_or(0);
-
+    
     // Обновляем статус только если нет других сессий
     if active_sessions == 0 {
         sqlx::query!(
@@ -384,11 +417,25 @@ pub async fn handle_logout(user_id: i32, session_token: Option<String>) -> Resul
         .await
         .map_err(|e| e.to_string())?;
     }
-
+    
     transaction.commit()
         .await
         .map_err(|e| e.to_string())?;
-
+    
+    // Если нет других активных сессий, уведомляем об оффлайн статусе
+    if active_sessions == 0 {
+        if let Some(user) = user_info {
+            notify_user_status_change(
+                &manager,
+                user_id,
+                &user.username,
+                &user.avatar,
+                "offline",
+                &user_guilds,
+            ).await;
+        }
+    }
+    
     Ok(true)
 }
 
