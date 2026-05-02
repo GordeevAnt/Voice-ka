@@ -157,9 +157,18 @@ class WebSocketService {
 
     // Ожидание аутентификации
     async waitForAuth(): Promise<void> {
-        if (this.isAuthenticated) return;
+        console.log('⏳ waitForAuth called, isAuthenticated:', this.isAuthenticated);
+        if (this.isAuthenticated) {
+            console.log('✅ Already authenticated');
+            return;
+        }
         if (this.pendingAuthPromise) {
+            console.log('⏳ Waiting for auth promise...');
             await this.pendingAuthPromise;
+            console.log('✅ Auth promise resolved');
+        } else {
+            console.log('⚠️ No auth promise, waiting 1 second...');
+            await new Promise(resolve => setTimeout(resolve, 1000));
         }
     }
 
@@ -185,8 +194,11 @@ class WebSocketService {
     }
 
     async request(type: string, data?: any, options?: { room_id?: number; guild_id?: number }): Promise<any> {
+        console.log(`📤 Sending request: ${type}`, { data, options });
+        
         // Ждем подключения
         if (!this.isConnected) {
+            console.log('⏳ Waiting for connection...');
             await new Promise<void>((resolve) => {
                 const unsubscribe = this.onConnectionChange((connected) => {
                     if (connected) {
@@ -216,10 +228,13 @@ class WebSocketService {
         if (options?.room_id) payload.room_id = options.room_id;
         if (options?.guild_id) payload.guild_id = options.guild_id;
         
+        console.log(`📤 Sending payload:`, payload);
+        
         return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
                 if (this.pendingRequests.has(requestId)) {
                     this.pendingRequests.delete(requestId);
+                    console.error(`❌ Request timeout: ${type}`);
                     reject(new Error('Request timeout'));
                 }
             }, 30000);
@@ -229,10 +244,12 @@ class WebSocketService {
                 type, 
                 resolve: (value) => {
                     clearTimeout(timeout);
+                    console.log(`✅ Request resolved: ${type}`, value);
                     resolve(value);
                 }, 
                 reject: (reason) => {
                     clearTimeout(timeout);
+                    console.error(`❌ Request rejected: ${type}`, reason);
                     reject(reason);
                 }
             });

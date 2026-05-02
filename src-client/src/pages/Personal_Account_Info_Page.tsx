@@ -1,8 +1,9 @@
 // pages/Personal_Account_Info_Page.tsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { invoke } from "@tauri-apps/api/core";
+import { apiService } from "../features/api.service";
 import { storeAPI } from "../features/useStore";
+import { wsService } from "../features/websocket.service";
 import "./Info_Pages.css";
 
 interface User {
@@ -46,10 +47,11 @@ export function Personal_Account_Info_Page() {
 
     useEffect(() => {
         const loadInitialData = async () => {
-            const storedUserId = await storeAPI.get<string>('user_id');
+            await wsService.waitForAuth();
+            
+            const storedUserId = await storeAPI.get<number>('user_id');
             if (storedUserId) {
-                const parsedUserId = parseInt(storedUserId);
-                setUserId(parsedUserId);
+                setUserId(storedUserId);
             }
         };
         loadInitialData();
@@ -69,43 +71,40 @@ export function Personal_Account_Info_Page() {
         try {
             const sessionId = await storeAPI.get<string>('session_id');
             
-            // Используем session_id для получения текущего пользователя
-            const userData = await invoke<User>("get_current_user", { 
-                sessionId: sessionId 
-            });
-            setUser(userData);
-            
-            // Сохраняем актуальный user_id
-            await storeAPI.set('user_id', userData.id.toString());
-            setUserId(userData.id);
-            
-            // Также сохраняем username для fallback
-            await storeAPI.set('username', userData.username);
-            
-            setEditData({
-                username: userData.username,
-                email: userData.email,
-                currentPassword: "",
-                newPassword: "",
-                confirmPassword: ""
-            });
+            if (sessionId) {
+                const userData = await apiService.getCurrentUser(sessionId);
+                if (userData) {
+                    setUser(userData);
+                    
+                    await storeAPI.set('user_id', userData.id.toString());
+                    setUserId(userData.id);
+                    await storeAPI.set('username', userData.username);
+                    
+                    setEditData({
+                        username: userData.username,
+                        email: userData.email,
+                        currentPassword: "",
+                        newPassword: "",
+                        confirmPassword: ""
+                    });
+                }
+            } else {
+                const storedUserId = await storeAPI.get<string>('user_id');
+                const storedUsername = await storeAPI.get<string>('username');
+                
+                if (storedUserId) {
+                    setUser({
+                        id: parseInt(storedUserId),
+                        username: storedUsername || 'Пользователь',
+                        email: '',
+                        avatar: null,
+                        status: 'online'
+                    });
+                    setUserId(parseInt(storedUserId));
+                }
+            }
         } catch (err) {
             console.error("Ошибка загрузки информации о пользователе:", err);
-            
-            // Fallback: используем сохраненные данные
-            const storedUserId = await storeAPI.get<string>('user_id');
-            const storedUsername = await storeAPI.get<string>('username');
-            
-            if (storedUserId) {
-                setUser({
-                    id: parseInt(storedUserId),
-                    username: storedUsername || 'Пользователь',
-                    email: '',
-                    avatar: null,
-                    status: 'online'
-                });
-                setUserId(parseInt(storedUserId));
-            }
         }
     };
 
@@ -113,8 +112,10 @@ export function Personal_Account_Info_Page() {
         if (!userId) return;
         
         try {
-            const statsData = await invoke<UserStats>("get_user_stats", { userId });
-            setStats(statsData);
+            const statsData = await apiService.getUserStats(userId);
+            if (statsData) {
+                setStats(statsData);
+            }
         } catch (err) {
             console.error("Ошибка загрузки статистики:", err);
         }
@@ -124,7 +125,7 @@ export function Personal_Account_Info_Page() {
         if (!userId) return;
         
         try {
-            const guildsData = await invoke<Guild[]>("get_user_guilds_with_role", { userId });
+            const guildsData = await apiService.getUserGuildsWithRole(userId);
             setGuilds(guildsData);
         } catch (err) {
             console.error("Ошибка загрузки каналов:", err);
@@ -140,21 +141,22 @@ export function Personal_Account_Info_Page() {
         }
 
         try {
-            await invoke("update_user_profile", {
-                userId,
+            const success = await apiService.updateUserProfile(userId, {
                 username: editData.username,
                 email: editData.email,
                 currentPassword: editData.currentPassword || null,
                 newPassword: editData.newPassword || null
             });
             
-            alert("Профиль успешно обновлен!");
-            setIsEditing(false);
-            
-            // Обновляем сохраненное имя пользователя
-            await storeAPI.set('username', editData.username);
-            
-            loadUserInfo(); // Перезагружаем данные
+            if (success) {
+                alert("Профиль успешно обновлен!");
+                setIsEditing(false);
+                
+                await storeAPI.set('username', editData.username);
+                loadUserInfo();
+            } else {
+                alert("Ошибка обновления профиля");
+            }
         } catch (err) {
             console.error("Ошибка обновления профиля:", err);
             alert(err instanceof Error ? err.message : "Ошибка обновления профиля");
@@ -179,12 +181,6 @@ export function Personal_Account_Info_Page() {
             case 'offline': return '#747f8d';
             default: return '#747f8d';
         }
-    };
-
-    const formatVoiceTime = (seconds: number) => {
-        const hours = Math.floor(seconds / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-        return `${hours}ч ${minutes}м`;
     };
 
     if (loading) {
@@ -258,6 +254,13 @@ export function Personal_Account_Info_Page() {
                                 <label>Последний визит:</label>
                                 <span>{stats ? new Date(stats.last_seen).toLocaleString() : "Неизвестно"}</span>
                             </div>
+                            
+                            <button 
+                                className="edit-profile-btn"
+                                onClick={() => setIsEditing(true)}
+                            >
+                                ✏️ Редактировать профиль
+                            </button>
                         </div>
                     </>
                 ) : (

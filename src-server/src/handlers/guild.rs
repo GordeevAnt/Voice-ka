@@ -272,3 +272,96 @@ pub async fn handle_get_guild_members(guild_id: i32) -> Result<Vec<serde_json::V
         })
     }).collect())
 }
+
+pub async fn handle_find_guild_by_id(guild_id: i32) -> Result<serde_json::Value, String> {
+    let pool = get_db_pool();
+
+    let guild = sqlx::query(
+        "SELECT id, name, icon, owner_id, description FROM guilds WHERE id = $1"
+    )
+    .bind(guild_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| format!("Failed to find guild: {}", e))?;
+
+    match guild {
+        Some(row) => {
+            let id: i32 = row.get(0);
+            let name: String = row.get(1);
+            let icon: Option<String> = row.get(2);
+            let owner_id: i32 = row.get(3);
+            let description: Option<String> = row.get(4);
+            
+            Ok(json!({
+                "id": id,
+                "name": name,
+                "icon": icon,
+                "owner_id": owner_id,
+                "description": description
+            }))
+        }
+        None => Err("Guild not found".to_string())
+    }
+}
+
+pub async fn handle_get_online_guild_members(guild_id: i32) -> Result<Vec<serde_json::Value>, String> {
+    let pool = get_db_pool();
+
+    let members = sqlx::query(
+        "SELECT u.id, u.username, u.avatar, u.status
+        FROM guild_members gm
+        JOIN users u ON gm.user_id = u.id
+        WHERE gm.guild_id = $1 AND u.status != 'offline'
+        ORDER BY u.username"
+    )
+    .bind(guild_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| format!("Failed to get online members: {}", e))?;
+
+    Ok(members.into_iter().map(|row| {
+        let user_id: i32 = row.get(0);
+        let username: String = row.get(1);
+        let avatar: Option<String> = row.get(2);
+        let status: String = row.get(3);
+        
+        json!({
+            "user_id": user_id,
+            "username": username,
+            "avatar": avatar,
+            "status": status
+        })
+    }).collect())
+}
+
+pub async fn handle_get_user_guilds_with_role(user_id: i32) -> Result<Vec<serde_json::Value>, String> {
+    let pool = get_db_pool();
+
+    let guilds = sqlx::query(
+        "SELECT g.id, g.name, g.icon, r.name as role_name
+        FROM guilds g
+        INNER JOIN guild_members gm ON g.id = gm.guild_id
+        LEFT JOIN member_roles mr ON mr.user_id = gm.user_id AND mr.guild_id = g.id
+        LEFT JOIN roles r ON r.id = mr.role_id
+        WHERE gm.user_id = $1
+        ORDER BY g.name"
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| format!("Failed to get user guilds: {}", e))?;
+
+    Ok(guilds.into_iter().map(|row| {
+        let id: i32 = row.get(0);
+        let name: String = row.get(1);
+        let icon: Option<String> = row.get(2);
+        let role: Option<String> = row.get(3);
+        
+        json!({
+            "id": id,
+            "name": name,
+            "icon": icon,
+            "role": role.unwrap_or("member".to_string())
+        })
+    }).collect())
+}

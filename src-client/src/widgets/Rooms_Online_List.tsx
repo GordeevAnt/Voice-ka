@@ -1,7 +1,7 @@
 // widgets/Rooms_Online_List.tsx
 import { useCallback, useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { useWebSocket } from "../features/useWebsocket";
+import { apiService } from "../features/api.service";
+import { wsService } from "../features/websocket.service";
 import "./Rooms_Online_List.css";
 
 interface OnlineUser {
@@ -26,28 +26,36 @@ export function Rooms_Online_List({ guildId }: RoomsOnlineListProps) {
             if (['online', 'idle', 'dnd'].includes(user.status)) {
                 const exists = prev.find(u => u.user_id === user.user_id);
                 if (exists) {
-                    // Обновляем существующего пользователя
                     return prev.map(u => 
                         u.user_id === user.user_id ? user : u
                     );
                 } else {
-                    // Добавляем нового онлайн пользователя
                     return [...prev, user];
                 }
             } else {
-                // Удаляем оффлайн пользователя
                 return prev.filter(u => u.user_id !== user.user_id);
             }
         });
     }, []);
 
-    // Используем WebSocket хук с обработчиками
-    const { isConnected } = useWebSocket({
-        currentGuildId: guildId,
-        onUserStatusChanged: handleUserStatusChanged,
-    });
+    // Подписка на события через WebSocket
+    useEffect(() => {
+        const unsubscribeStatus = wsService.on('user_status_changed', handleUserStatusChanged);
+        const unsubscribeOnline = wsService.on('user_online', (user) => {
+            handleUserStatusChanged(user);
+        });
+        const unsubscribeOffline = wsService.on('user_offline', (userId) => {
+            setOnlineUsers(prev => prev.filter(u => u.user_id !== userId));
+        });
+        
+        return () => {
+            unsubscribeStatus();
+            unsubscribeOnline();
+            unsubscribeOffline();
+        };
+    }, [handleUserStatusChanged]);
 
-    // Загрузка начальных данных
+    // Загрузка начальных данных через WebSocket
     useEffect(() => {
         if (!guildId) {
             setOnlineUsers([]);
@@ -58,9 +66,7 @@ export function Rooms_Online_List({ guildId }: RoomsOnlineListProps) {
         const loadOnlineUsers = async () => {
             setLoading(true);
             try {
-                const users = await invoke<OnlineUser[]>("get_online_guild_members", { 
-                    guildId: guildId
-                });
+                const users = await apiService.getOnlineGuildMembers(guildId);
                 console.log('📋 Loaded online users:', users);
                 setOnlineUsers(users);
             } catch (error) {
@@ -72,7 +78,14 @@ export function Rooms_Online_List({ guildId }: RoomsOnlineListProps) {
         };
 
         loadOnlineUsers();
-    }, [guildId, isConnected]); // Обновляем при изменении статуса подключения
+        
+        // Подписываемся на гильдию для получения обновлений статусов
+        wsService.subscribeGuild(guildId);
+        
+        return () => {
+            wsService.unsubscribeGuild(guildId);
+        };
+    }, [guildId]);
 
     // Функции для аватаров
     const getInitials = (username: string) => {
@@ -113,9 +126,10 @@ export function Rooms_Online_List({ guildId }: RoomsOnlineListProps) {
 
     return (
         <div className="rooms-online-list-block">
+            <div className="online-users-header">Онлайн ({onlineUsers.length})</div>
             <div className="rooms-online-list">
                 {onlineUsers.length === 0 ? (
-                    <div className="no-online-users">Нет пользователей</div>
+                    <div className="no-online-users">Нет пользователей в сети</div>
                 ) : (
                     onlineUsers.map((user) => (
                         <div key={user.user_id} className="online-user" title={user.username}>
@@ -133,7 +147,7 @@ export function Rooms_Online_List({ guildId }: RoomsOnlineListProps) {
                                 <span className="online-user-name">{user.username}</span>
                                 <span className="online-user-status">{user.status}</span>
                             </div>
-                            <div className="online-user-status-dot" />
+                            <div className={`online-user-status-dot status-${user.status}`} />
                         </div>
                     ))
                 )}

@@ -1,8 +1,9 @@
 // pages/Room_Info_Page.tsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { invoke } from "@tauri-apps/api/core";
+import { apiService } from "../features/api.service";
 import { storeAPI } from "../features/useStore";
+import { wsService } from "../features/websocket.service";
 import "./Info_Pages.css";
 
 interface Room {
@@ -33,7 +34,6 @@ export function Room_Info_Page() {
     const [room, setRoom] = useState<Room | null>(null);
     const [users, setUsers] = useState<RoomUser[]>([]);
     const [loading, setLoading] = useState(true);
-    const [currentUserId, setCurrentUserId] = useState<number | null>(null);
     const [roomId, setRoomId] = useState<number>(0);
     const [isEditing, setIsEditing] = useState(false);
     const [editData, setEditData] = useState({
@@ -45,16 +45,12 @@ export function Room_Info_Page() {
 
     useEffect(() => {
         const loadInitialData = async () => {
-            const storedRoomId = await storeAPI.get<string>('current_room_id');
-            const storedUserId = await storeAPI.get<string>('user_id');
+            await wsService.waitForAuth();
             
-            if (storedUserId) {
-                setCurrentUserId(parseInt(storedUserId));
-            }
+            const storedRoomId = await storeAPI.get<number>('current_room_id');
             
             if (storedRoomId) {
-                const id = parseInt(storedRoomId);
-                setRoomId(id);
+                setRoomId(storedRoomId);
             }
         };
         
@@ -73,7 +69,7 @@ export function Room_Info_Page() {
         if (!roomId) return;
 
         try {
-            const roomData = await invoke<Room>("get_room_by_id", { roomId });
+            const roomData = await apiService.getRoomById(roomId);
             if (roomData) {
                 setRoom(roomData);
                 setEditData({
@@ -245,6 +241,12 @@ export function Room_Info_Page() {
                                 </div>
                             </>
                         )}
+                        
+                        <div className="form-buttons">
+                            <button onClick={() => setIsEditing(false)} className="cancel-btn">
+                                Отмена
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>

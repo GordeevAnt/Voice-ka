@@ -7,6 +7,7 @@ use argon2::{
 };
 use chrono::Utc;
 use serde_json::json;
+use sqlx::Row;
 use uuid::Uuid;
 
 #[derive(Debug, serde::Deserialize)]
@@ -388,5 +389,189 @@ pub async fn handle_logout(user_id: i32, session_token: Option<String>) -> Resul
         .await
         .map_err(|e| e.to_string())?;
 
+    Ok(true)
+}
+
+pub async fn handle_get_current_user(session_token: &str) -> Result<serde_json::Value, String> {
+    let pool = get_db_pool();
+
+    // Используем query вместо query! для Option типов
+    let user = sqlx::query(
+        "SELECT u.id, u.username, u.email, u.avatar, u.status, u.last_seen
+        FROM users u
+        INNER JOIN websocket_sessions ws ON u.id = ws.user_id
+        WHERE ws.connection_id = $1 AND ws.status = 'active'"
+    )
+    .bind(session_token)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| format!("Database error: {}", e))?;
+
+    match user {
+        Some(row) => {
+            let id: i32 = row.get(0);
+            let username: String = row.get(1);
+            let email: String = row.get(2);
+            let avatar: Option<String> = row.get(3);
+            let status: String = row.get(4);
+            let last_seen: chrono::DateTime<chrono::Utc> = row.get(5);
+            
+            Ok(json!({
+                "id": id,
+                "username": username,
+                "email": email,
+                "avatar": avatar,
+                "status": status,
+                "last_seen": last_seen.to_rfc3339()
+            }))
+        }
+        None => Err("User not found".to_string())
+    }
+}
+
+pub async fn handle_get_user_stats(user_id: i32) -> Result<serde_json::Value, String> {
+    let pool = get_db_pool();
+
+    // Получаем количество сообщений
+    let total_messages: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM messages WHERE user_id = $1"
+    )
+    .bind(user_id)
+    .fetch_one(pool)
+    .await
+    .unwrap_or(0);
+
+    // Получаем общее время в голосовых каналах
+    let total_voice_time: i64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (left_at - joined_at))), 0)::bigint 
+         FROM voice_activity_logs WHERE user_id = $1"
+    )
+    .bind(user_id)
+    .fetch_one(pool)
+    .await
+    .unwrap_or(0);
+
+    // Получаем количество гильдий
+    let total_guilds: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM guild_members WHERE user_id = $1"
+    )
+    .bind(user_id)
+    .fetch_one(pool)
+    .await
+    .unwrap_or(0);
+
+    // Получаем информацию о пользователе
+    let user = sqlx::query(
+        "SELECT created_at, last_seen FROM users WHERE id = $1"
+    )
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| format!("Database error: {}", e))?;
+
+    match user {
+        Some(row) => {
+            let created_at: chrono::DateTime<chrono::Utc> = row.get(0);
+            let last_seen: chrono::DateTime<chrono::Utc> = row.get(1);
+            
+            Ok(json!({
+                "total_messages": total_messages,
+                "total_voice_time": total_voice_time,
+                "total_guilds": total_guilds,
+                "registration_date": created_at.to_rfc3339(),
+                "last_seen": last_seen.to_rfc3339()
+            }))
+        }
+        None => Err("User not found".to_string())
+    }
+}
+
+pub async fn handle_update_user_profile(
+    user_id: i32, 
+    data: serde_json::Value
+) -> Result<bool, String> {
+    let pool = get_db_pool();
+    
+    let username = data.get("username").and_then(|v| v.as_str());
+    let email = data.get("email").and_then(|v| v.as_str());
+    let current_password = data.get("currentPassword").and_then(|v| v.as_str());
+    let new_password = data.get("newPassword").and_then(|v| v.as_str());
+    
+    let mut transaction = pool.begin()
+        .await
+        .map_err(|e| e.to_string())?;
+    
+    // Если меняется пароль, проверяем текущий
+    if let (Some(current), Some(new)) = (current_password, new_password) {
+        if !new.is_empty() {
+            // Получаем текущий хеш пароля
+            let stored_hash: Option<String> = sqlx::query_scalar(
+                "SELECT password_hash FROM users WHERE id = $1"
+            )
+            .bind(user_id)
+            .fetch_one(&mut *transaction)
+            .await
+            .map_err(|e| e.to_string())?;
+            
+            if let Some(hash) = stored_hash {
+                let argon2 = Argon2::default();
+                let parsed_hash = PasswordHash::new(&hash)
+                    .map_err(|e| format!("Hash error: {}", e))?;
+                
+                argon2.verify_password(current.as_bytes(), &parsed_hash)
+                    .map_err(|_| "Invalid current password".to_string())?;
+                
+                // Хешируем новый пароль
+                let salt = SaltString::generate(&mut OsRng);
+                let new_hash = argon2
+                    .hash_password(new.as_bytes(), &salt)
+                    .map_err(|e| format!("Hash error: {}", e))?
+                    .to_string();
+                
+                sqlx::query(
+                    "UPDATE users SET password_hash = $1 WHERE id = $2"
+                )
+                .bind(&new_hash)
+                .bind(user_id)
+                .execute(&mut *transaction)
+                .await
+                .map_err(|e| e.to_string())?;
+            }
+        }
+    }
+    
+    // Обновляем username и email
+    if let Some(uname) = username {
+        if !uname.is_empty() && uname.len() >= 3 {
+            sqlx::query(
+                "UPDATE users SET username = $1, updated_at = $2 WHERE id = $3"
+            )
+            .bind(uname)
+            .bind(Utc::now())
+            .bind(user_id)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|e| e.to_string())?;
+        }
+    }
+    
+    if let Some(em) = email {
+        if !em.is_empty() && em.contains('@') {
+            sqlx::query(
+                "UPDATE users SET email = $1, updated_at = $2 WHERE id = $3"
+            )
+            .bind(em)
+            .bind(Utc::now())
+            .bind(user_id)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|e| e.to_string())?;
+        }
+    }
+    
+    transaction.commit()
+        .await
+        .map_err(|e| e.to_string())?;
+    
     Ok(true)
 }

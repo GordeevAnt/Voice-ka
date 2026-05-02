@@ -165,8 +165,11 @@ class ApiService {
 
     async createRoom(roomData: any): Promise<any> {
         try {
+            console.log('📤 createRoom called with:', roomData);
             await wsService.waitForAuth();
+            console.log('✅ Auth OK, sending request...');
             const result = await wsService.request('create_room', roomData);
+            console.log('✅ createRoom result:', result);
             return result.room;
         } catch (err) {
             console.error('Create room error:', err);

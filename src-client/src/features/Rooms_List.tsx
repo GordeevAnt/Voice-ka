@@ -70,9 +70,13 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
         setError(null);
         
         try {
+            // Ждем аутентификации перед загрузкой
+            await wsService.waitForAuth();
             const guildRooms = await apiService.getGuildRooms(guildId);
-            console.log('📋 Loaded rooms:', guildRooms);
-            setRooms(guildRooms);
+            console.log('📋 Loaded rooms for guild', guildId, ':', guildRooms);
+            // Фильтруем только текстовые комнаты для отображения
+            const textRooms = guildRooms.filter(r => r.type === 'text');
+            setRooms(textRooms);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Ошибка загрузки комнат");
             console.error("Failed to load rooms:", err);
@@ -84,7 +88,7 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
     useEffect(() => {
         loadRooms();
         
-        // Подписываемся на комнату гильдии
+        // Подписываемся на гильдию для получения обновлений
         wsService.subscribeGuild(guildId);
         
         return () => {
@@ -104,17 +108,28 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
             return;
         }
         
+        const roomData = {
+            name: newRoomName.trim(),
+            room_type: 'text',
+            topic: newRoomTopic.trim() || null,
+            bitrate: null,
+            user_limit: null,
+            creator_id: userId
+        };
+        
+        console.log('📝 Creating room with data:', roomData);
+        
         try {
-            const newRoom = await apiService.createRoom({
-                name: newRoomName.trim(),
-                room_type: 'text',
-                guild_id: guildId,
-                topic: newRoomTopic.trim() || null,
-                bitrate: null,
-                user_limit: null,
-                creator_id: userId
-            });
+            await wsService.waitForAuth();
+            console.log('✅ Auth OK');
             
+            // Отправляем guild_id отдельно, а данные в data
+            const result = await wsService.request('create_room', roomData, { guild_id: guildId });
+            console.log('✅ Room created:', result);
+            
+            const newRoom = result.room;
+            
+            // Добавляем новую комнату в список
             setRooms(prev => {
                 const exists = prev.some(r => r.id === newRoom.id);
                 if (exists) return prev;
@@ -151,8 +166,6 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
         );
     }
 
-    const textRooms = rooms.filter(r => r.room_type === 'text');
-
     return (
         <div className="rooms-list-block">
             <div className="rooms-header">
@@ -163,15 +176,19 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
             </div>
             
             <div className="rooms-list">
-                {textRooms.map((room) => (
-                    <Switch_Room_Button
-                        key={room.id}
-                        roomId={room.id}
-                        name={room.name}
-                        isActive={currentRoomId === room.id}
-                        onSelect={onRoomSelect}
-                    />
-                ))}
+                {rooms.length === 0 ? (
+                    <div className="no-rooms">Нет текстовых комнат</div>
+                ) : (
+                    rooms.map((room) => (
+                        <Switch_Room_Button
+                            key={room.id}
+                            roomId={room.id}
+                            name={room.name}
+                            isActive={currentRoomId === room.id}
+                            onSelect={onRoomSelect}
+                        />
+                    ))
+                )}
             </div>
             
             {showCreateModal && (

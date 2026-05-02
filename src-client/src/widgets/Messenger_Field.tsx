@@ -16,6 +16,7 @@ export function Messenger_Field({ roomId, currentUserId }: MessengerFieldProps) 
     useEffect(() => {
         // Подписываемся на новые сообщения
         const unsubscribe = wsService.on('new_message', (message) => {
+            console.log('📨 New message received:', message);
             setLastMessage(message);
         });
         

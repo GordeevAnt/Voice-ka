@@ -1,8 +1,9 @@
 // pages/Chanel_Info_Page.tsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { invoke } from "@tauri-apps/api/core";
+import { apiService } from "../features/api.service";
 import { storeAPI } from "../features/useStore";
+import { wsService } from "../features/websocket.service";
 import "./Info_Pages.css";
 
 interface Guild {
@@ -26,21 +27,18 @@ export function Chanel_Info_Page() {
     const [guild, setGuild] = useState<Guild | null>(null);
     const [members, setMembers] = useState<GuildMember[]>([]);
     const [loading, setLoading] = useState(true);
-    const [currentUserId, setCurrentUserId] = useState<number | null>(null);
     const [guildId, setGuildId] = useState<number>(0);
 
     useEffect(() => {
         const loadData = async () => {
-            const storedGuildId = await storeAPI.get<string>('current_guild_id');
-            const storedUserId = await storeAPI.get<string>('user_id');
+            await wsService.waitForAuth();
             
-            if (storedUserId) {
-                setCurrentUserId(parseInt(storedUserId));
-            }
+            const storedGuildId = await storeAPI.get<number>('current_guild_id');
             
             if (storedGuildId) {
-                const id = parseInt(storedGuildId);
-                setGuildId(id);
+                setGuildId(storedGuildId);
+            } else {
+                setLoading(false);
             }
         };
         
@@ -58,7 +56,7 @@ export function Chanel_Info_Page() {
         if (!guildId) return;
 
         try {
-            const guildData = await invoke<Guild>("find_guild_by_id", { guildId });
+            const guildData = await apiService.findGuildById(guildId);
             if (guildData) {
                 setGuild(guildData);
             }
@@ -71,7 +69,7 @@ export function Chanel_Info_Page() {
         if (!guildId) return;
 
         try {
-            const membersData = await invoke<GuildMember[]>("get_guild_members", { guildId });
+            const membersData = await apiService.getGuildMembers(guildId);
             setMembers(membersData);
         } catch (err) {
             console.error("Ошибка загрузки участников:", err);
