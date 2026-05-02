@@ -20,8 +20,11 @@ class WebSocketService {
     private pendingRequests = new Map<string, Request>();
     private eventHandlers = new Map<string, Set<MessageHandler>>();
     private connectionListeners = new Set<(connected: boolean) => void>();
+    private authListeners = new Set<(authenticated: boolean) => void>();
     private sessionToken: string | null = null;
     private userId: number | null = null;
+    private pendingAuthPromise: Promise<void> | null = null;
+    private resolveAuthPromise: (() => void) | null = null;
 
     constructor() {
         this.init();
@@ -52,7 +55,14 @@ class WebSocketService {
             // Если есть сохраненный токен, отправляем аутентификацию
             if (this.sessionToken) {
                 console.log('🔐 Sending auth with existing token...');
-                this.authenticate(this.sessionToken, this.userId!);
+                this.sendAuth(this.sessionToken);
+            } else {
+                // Создаем промис, который будет разрешен при успешной аутентификации
+                this.pendingAuthPromise = new Promise((resolve) => {
+                    this.resolveAuthPromise = resolve;
+                });
+                this.isAuthenticated = false;
+                this.notifyAuthListeners();
             }
         };
 
@@ -70,6 +80,7 @@ class WebSocketService {
             this.isConnected = false;
             this.isAuthenticated = false;
             this.notifyConnectionListeners();
+            this.notifyAuthListeners();
             
             if (event.code !== 1000 && event.code !== 1001) {
                 this.handleReconnect();
@@ -79,6 +90,53 @@ class WebSocketService {
         this.ws.onerror = (error) => {
             console.error('WebSocket error:', error);
         };
+    }
+
+    private sendAuth(sessionToken: string) {
+        const requestId = this.generateRequestId();
+        const payload = {
+            type: 'auth',
+            request_id: requestId,
+            data: { session_token: sessionToken }
+        };
+        
+        // Создаем промис для ожидания ответа
+        this.pendingAuthPromise = new Promise((resolve, reject) => {
+            this.pendingRequests.set(requestId, {
+                id: requestId,
+                type: 'auth',
+                resolve: (result) => {
+                    if (result.success) {
+                        this.isAuthenticated = true;
+                        this.userId = result.user_id;
+                        console.log('✅ WebSocket authenticated');
+                        if (this.resolveAuthPromise) {
+                            this.resolveAuthPromise();
+                            this.resolveAuthPromise = null;
+                        }
+                        this.notifyAuthListeners();
+                        resolve(result);
+                    } else {
+                        this.isAuthenticated = false;
+                        reject(new Error('Authentication failed'));
+                    }
+                },
+                reject: (err) => {
+                    this.isAuthenticated = false;
+                    reject(err);
+                }
+            });
+            
+            this.ws!.send(JSON.stringify(payload));
+            
+            // Таймаут на случай отсутствия ответа
+            setTimeout(() => {
+                if (this.pendingRequests.has(requestId)) {
+                    this.pendingRequests.delete(requestId);
+                    reject(new Error('Auth timeout'));
+                }
+            }, 10000);
+        });
     }
 
     private handleReconnect() {
@@ -95,6 +153,14 @@ class WebSocketService {
         setTimeout(() => {
             this.connect();
         }, delay);
+    }
+
+    // Ожидание аутентификации
+    async waitForAuth(): Promise<void> {
+        if (this.isAuthenticated) return;
+        if (this.pendingAuthPromise) {
+            await this.pendingAuthPromise;
+        }
     }
 
     private async handleMessage(message: any) {
@@ -119,6 +185,7 @@ class WebSocketService {
     }
 
     async request(type: string, data?: any, options?: { room_id?: number; guild_id?: number }): Promise<any> {
+        // Ждем подключения
         if (!this.isConnected) {
             await new Promise<void>((resolve) => {
                 const unsubscribe = this.onConnectionChange((connected) => {
@@ -175,23 +242,19 @@ class WebSocketService {
     }
 
     async authenticate(token: string, userId: number): Promise<void> {
+        console.log('🔐 Authenticating with token on existing connection...');
         this.sessionToken = token;
         this.userId = userId;
         
+        // Сохраняем в хранилище
         await storeAPI.set('session_id', token);
         await storeAPI.set('user_id', userId);
         await storeAPI.set('token', 'true');
         
-        try {
-            const result = await this.request('auth', { session_token: token });
-            if (result.success) {
-                this.isAuthenticated = true;
-                console.log('✅ Authenticated successfully');
-            }
-        } catch (err) {
-            console.error('Authentication failed:', err);
-            throw err;
-        }
+        // Отправляем auth запрос
+        await this.sendAuth(token);
+        
+        console.log('✅ Authentication completed on existing connection');
     }
 
     notify(type: string, data?: any, options?: { room_id?: number; guild_id?: number }) {
@@ -250,8 +313,19 @@ class WebSocketService {
         };
     }
 
+    onAuthChange(listener: (authenticated: boolean) => void): () => void {
+        this.authListeners.add(listener);
+        return () => {
+            this.authListeners.delete(listener);
+        };
+    }
+
     private notifyConnectionListeners() {
         this.connectionListeners.forEach(listener => listener(this.isConnected));
+    }
+
+    private notifyAuthListeners() {
+        this.authListeners.forEach(listener => listener(this.isAuthenticated));
     }
 
     private generateRequestId(): string {
