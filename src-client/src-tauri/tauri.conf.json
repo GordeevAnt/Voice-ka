@@ -14,7 +14,7 @@
       {
         "decorations": false,
         "minWidth": 750,
-        "minHeight": 400,
+        "minHeight": 580,
         "maxWidth": 1920,
         "maxHeight": 1080,
         "resizable": true

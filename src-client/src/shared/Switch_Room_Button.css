@@ -1,38 +1,30 @@
-/* Switch_Room_Button.css - Готический стиль */
 .switch-room-wrapper {
     display: flex;
     align-items: center;
-    padding: 8px 12px;
+    padding: 8px 16px;
     margin: 1px 8px;
     cursor: pointer;
     background-color: transparent;
-    transition: background-color 0.15s ease;
-    position: relative;
+    transition: all 0.15s ease;
+    border-radius: 6px;
 }
 
 .switch-room-wrapper:hover {
-    background-color: #1e1e28;
+    background-color: #2a2a30;
 }
 
 .switch-room-wrapper.active {
-    background-color: #24242f;
-    border-left: 2px solid #5a4a5a;
+    background-color: #1e1e28;
+    border-left: 3px solid #5865f2;
 }
 
 .switch-room-wrapper.active:hover {
-    background-color: #24242f;  /* Оставляем тот же цвет, что и у активной */
+    background-color: #1e1e28;
     cursor: default;
 }
 
 .switch-room-wrapper:not(.active) {
     cursor: pointer;
-}
-
-.switch-room-wrapper {
-    user-select: none;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
 }
 
 .switch-room-content {
@@ -51,16 +43,14 @@
 
 .room-icon {
     font-size: 16px;
-    color: #6a5a6a;
-    font-weight: 500;
+    color: #6a6a7a;
 }
 
 .room-name {
     margin: 0;
     font-size: 13px;
-    color: #c0b0c0;
+    color: #b0b0c0;
     font-weight: 400;
-    font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
 }
 
 .room-right {
@@ -70,14 +60,13 @@
 }
 
 .member-count {
-    font-size: 10px;
-    color: #6a5a6a;
-    background: #1e1e28;
-    padding: 2px 5px;
-    font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+    font-size: 11px;
+    color: #6a6a7a;
+    background: #2a2a30;
+    padding: 2px 6px;
+    border-radius: 10px;
 }
 
-/* Кнопка удаления комнаты - готический стиль */
 .delete-room-btn {
     background: none;
     border: none;
@@ -85,24 +74,18 @@
     padding: 4px 6px;
     font-size: 14px;
     transition: all 0.2s ease;
-    color: #5a4a5a;
-    opacity: 0.6;
-    font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
-    position: relative;
+    color: #6a6a7a;
+    opacity: 0.5;
+    border-radius: 4px;
 }
 
 .delete-room-btn:hover {
-    color: #8a5a6a;
+    color: #d46a6a;
     opacity: 1;
-    transform: scale(1.1);
+    background: #2a1a1a;
 }
 
-.delete-room-btn:active {
-    transform: scale(0.95);
-}
-
-/* Для поддержки фокуса с клавиатуры */
 .switch-room-wrapper:focus-visible {
-    outline: 1px solid #5a4a5a;
-    outline-offset: -1px;
+    outline: 2px solid #5865f2;
+    outline-offset: -2px;
 }

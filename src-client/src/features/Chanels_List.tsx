@@ -1,5 +1,5 @@
 // Chanels_List.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Switch_Chanel_Button } from "../shared/Switch_Chanel_Button";
 import { apiService } from "../features/api.service";
 import { storeAPI } from "../features/useStore";
@@ -27,6 +27,7 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
     const [newGuildName, setNewGuildName] = useState("");
     const [newGuildDescription, setNewGuildDescription] = useState("");
     const [isCreating, setIsCreating] = useState(false);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     const getIcon = (icon: string | null) => {
         if (!icon) return "/voice-ka.svg";
@@ -54,6 +55,24 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        const container = scrollContainerRef.current;
+        if (!container) return;
+
+        // Проверяем, нужно ли показывать скролл
+        const checkScroll = () => {
+            const hasScroll = container.scrollWidth > container.clientWidth;
+            console.log('Has horizontal scroll:', hasScroll, 
+                        'scrollWidth:', container.scrollWidth, 
+                        'clientWidth:', container.clientWidth);
+        };
+
+        checkScroll();
+        window.addEventListener('resize', checkScroll);
+        
+        return () => window.removeEventListener('resize', checkScroll);
+    }, [guilds]); // Зависит от guilds, так как они влияют на ширину
 
     useEffect(() => {
         fetchGuilds();
@@ -137,7 +156,7 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
             >
                 +
             </button>
-            <div className="chanel-list-block">
+            <div className="chanel-list-block" ref={scrollContainerRef}>
                 <div className="chanel-list">
                     {guilds.map((guild) => (
                         <Switch_Chanel_Button

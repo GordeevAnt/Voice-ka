@@ -4,60 +4,92 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background-color: rgb(213, 214, 215);
+    background: linear-gradient(135deg, #0e0e12 0%, #1a1a22 100%);
 }
 
 .auth-greet {
-    font-size: 6vh;
+    font-size: 48px;
+    margin-bottom: 32px;
+    color: #e0e0e8;
 }
 
 .auth-form {
-    padding: 3vh 0 5vh 0;
-    width: 50%;
+    padding: 32px 0 48px 0;
+    width: 400px;
+    max-width: 90%;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 1vh;
+    gap: 16px;
 }
 
 .wrong-active {
-    height: 30px;
     width: 100%;
-    border: 3px solid red;
-    border-radius: 2px;
+    border: 1px solid #e81123;
+    border-radius: 8px;
     text-align: center;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    color: rgb(0, 0, 0);
+    padding: 10px;
+    color: #e81123;
+    background: rgba(232, 17, 35, 0.1);
+    font-size: 14px;
 }
 
 .login, .password {
     width: 100%;
-    height: 6vh;
+    padding: 12px 16px;
+    background: #1a1a22;
+    border: 1px solid #2a2a30;
+    border-radius: 8px;
+    color: #e0e0e8;
+    font-size: 14px;
 }
 
-.lost-password-btn-container {
-    width: 100%;
-    display: flex;
-    justify-content: flex-end;
+.login:focus, .password:focus {
+    outline: none;
+    border-color: #5865f2;
+}
+
+.login:disabled, .password:disabled {
+    opacity: 0.5;
 }
 
 .auth-buttons {
     width: 100%;
-    padding-top: 3vh;
-    display: flex;;
-    gap: 3vh;
+    padding-top: 24px;
+    display: flex;
+    gap: 16px;
 }
 
 .auth-form-btn {
-    height: 14vh;
+    flex: 1;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
 }
 
 .auth {
-    width: 35vh;
+    background: #5865f2;
+    color: white;
+}
+
+.auth:hover:not(:disabled) {
+    background: #4752c4;
 }
 
 .reg {
-    width: 100%;
+    background: #2a2a30;
+    color: #c0c0d0;
+}
+
+.reg:hover:not(:disabled) {
+    background: #3a3a40;
+}
+
+.auth-form-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }

@@ -1,8 +1,88 @@
 .message {
-    background-color: aliceblue; /* ! */
-    border-radius: 4px;
+    background: #1a1a22;
+    border-radius: 12px;
     display: flex;
     flex-direction: row;
-    justify-content: space-between;
-    padding: 0 10px;
+    padding: 12px;
+    transition: background 0.2s;
+}
+
+.message:hover {
+    background: #22222a;
+}
+
+.message-current-user {
+    background: #1e222e;
+    border-left: 3px solid #5865f2;
+}
+
+.message-avatar-block {
+    width: 40px;
+    height: 40px;
+    background: #5865f2;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 18px;
+    color: white;
+    flex-shrink: 0;
+    margin-right: 12px;
+}
+
+.message-content {
+    flex: 1;
+}
+
+.message-header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 4px;
+    flex-wrap: wrap;
+}
+
+.message-author {
+    font-weight: 600;
+    color: #e0e0e8;
+    font-size: 14px;
+}
+
+.message-time {
+    font-size: 11px;
+    color: #6a6a7a;
+}
+
+.message-text-block {
+    color: #c0c0d0;
+    font-size: 14px;
+    line-height: 1.4;
+    word-wrap: break-word;
+}
+
+.message-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.message:hover .message-actions {
+    opacity: 1;
+}
+
+.message-delete-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.message-delete-btn:hover {
+    background: #2a1a1a;
 }

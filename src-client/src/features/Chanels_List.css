@@ -4,9 +4,11 @@
     flex-direction: row;
     justify-content: center;
     align-items: center;
-    gap: 20px;
-    z-index: 100;   
-    background-color: #09bd00; /* ! */
+    gap: 16px;
+    z-index: 100;
+    background: #1a1a22;
+    border-top: 1px solid #2a2a30;
+    padding: 8px 16px;
 }
 
 .chanel-list-changer {
@@ -17,38 +19,59 @@
 
 .chanel-list-block {
     overflow-x: auto;
-    max-width: 70vw;
-    padding-bottom: 3px;
+    overflow-y: hidden;
+    padding-bottom: 4px;
+    flex: 1;
+    /* Плавная прокрутка */
+    scroll-behavior: smooth;
 }
 
+/* Стилизация полосы прокрутки */
 .chanel-list-block::-webkit-scrollbar {
-    display: flex;
-    flex-direction: column;
-    margin-top: 20px;
-    height: 5px;
-}
-
-.chanel-list-block::-webkit-scrollbar-thumb {
-    border-radius: 15px;
-    background-color: black;
+    height: 6px;
 }
 
 .chanel-list-block::-webkit-scrollbar-track {
-    border-radius: 15px;
-    background-color: grey;
+    background: #0e0e12;
+    border-radius: 3px;
+}
+
+.chanel-list-block::-webkit-scrollbar-thumb {
+    background: #3a3a45;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.chanel-list-block::-webkit-scrollbar-thumb:hover {
+    background: #4a4a55;
+}
+
+/* Firefox поддержка */
+.chanel-list-block {
+    scrollbar-width: thin;
+    scrollbar-color: #3a3a45 #0e0e12;
 }
 
 .chanel-list {
-    max-width: 70%;
     display: flex;
     flex-direction: row;
     justify-content: flex-start;
-    gap: 0.5vw;
+    gap: 12px;
+    padding: 4px 0;
+    /* Запрещаем перенос строк */
+    flex-wrap: nowrap;
+    /* Минимальная ширина для предотвращения сжатия */
+    min-width: min-content;
+}
+
+/* Фикс для кнопок - предотвращаем сжатие */
+.chanel-list .switch-chanel-btn {
+    flex-shrink: 0;
 }
 
 .create-guild-btn {
-    height: 40px;
-    width: 40px;
+    height: 44px;
+    width: 44px;
     border-radius: 50%;
     background: #2a2a35;
     border: none;
@@ -60,16 +83,116 @@
     align-items: center;
     justify-content: center;
     transition: all 0.2s ease;
-    margin-right: 4px;
+    flex-shrink: 0;
 }
 
 .create-guild-btn:hover {
-    background: #3a3a45;
-    color: #9a8a9a;
+    background: #5865f2;
+    color: white;
     transform: scale(1.05);
-    border-radius: 35%;
+    border-radius: 40%;
 }
 
 .create-guild-btn:active {
     transform: scale(0.95);
+}
+
+.loading {
+    color: #8a8a9a;
+    font-size: 13px;
+}
+
+/* Модальное окно создания канала */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+.create-guild-modal {
+    background: #1e1e26;
+    border: 1px solid #3a3a45;
+    border-radius: 12px;
+    padding: 24px;
+    min-width: 360px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.create-guild-modal h3 {
+    margin: 0 0 20px 0;
+    color: #c0c0d0;
+    text-align: center;
+    font-size: 18px;
+}
+
+.create-guild-modal input,
+.create-guild-modal textarea {
+    width: 100%;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+    background: #13131a;
+    border: 1px solid #3a3a45;
+    border-radius: 8px;
+    color: #e0e0e8;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.create-guild-modal input:focus,
+.create-guild-modal textarea:focus {
+    outline: none;
+    border-color: #5865f2;
+}
+
+.create-guild-modal textarea {
+    resize: vertical;
+    font-family: inherit;
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 20px;
+}
+
+.modal-buttons button {
+    padding: 8px 20px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s;
+}
+
+.modal-buttons button:first-child {
+    background: #2a2a30;
+    color: #8a8a9a;
+}
+
+.modal-buttons button:first-child:hover {
+    background: #3a3a40;
+    color: #c0c0d0;
+}
+
+.modal-buttons button:last-child {
+    background: #5865f2;
+    color: white;
+}
+
+.modal-buttons button:last-child:hover {
+    background: #4752c4;
+}
+
+.modal-buttons button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }

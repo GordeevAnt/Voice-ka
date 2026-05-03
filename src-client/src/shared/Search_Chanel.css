@@ -1,51 +1,29 @@
 .search-chanel-btn {
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
-    background: #36393f;
+    background: #2a2a30;
     border: none;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    vertical-align: middle;
     transition: all 0.2s;
 }
 
 .search-chanel-btn:hover {
     background: #5865f2;
-    border-radius: 16px;
+    border-radius: 12px;
 }
 
 .search-chanel-btn img {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
+    filter: invert(0.6);
 }
 
-/* Modal styles */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.7);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-    animation: fadeIn 0.2s ease;
-}
-
-.modal-content {
-    background: #2c2f33;
-    border-radius: 8px;
-    width: 90%;
-    max-width: 500px;
-    max-height: 80vh;
-    overflow-y: auto;
-    animation: slideIn 0.3s ease;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+.search-chanel-btn:hover img {
+    filter: invert(1);
 }
 
 .modal-header {
@@ -53,22 +31,22 @@
     justify-content: space-between;
     align-items: center;
     padding: 16px 20px;
-    border-bottom: 1px solid #23272a;
-    background: #2c2f33;
-    border-radius: 8px 8px 0 0;
+    border-bottom: 1px solid #2a2a30;
+    background: #1e1e26;
+    border-radius: 12px 12px 0 0;
 }
 
 .modal-header h2 {
     margin: 0;
-    color: #ffffff;
-    font-size: 20px;
+    color: #e0e0e8;
+    font-size: 18px;
 }
 
 .close-button {
     background: none;
     border: none;
-    color: #b9bbbe;
-    font-size: 28px;
+    color: #8a8a9a;
+    font-size: 24px;
     cursor: pointer;
     padding: 0;
     width: 32px;
@@ -76,13 +54,13 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 4px;
+    border-radius: 6px;
     transition: all 0.2s;
 }
 
 .close-button:hover {
-    color: #ffffff;
-    background: #23272a;
+    color: #e0e0e8;
+    background: #2a2a30;
 }
 
 .modal-body {
@@ -91,31 +69,30 @@
 
 .search-input-group {
     display: flex;
-    gap: 10px;
+    gap: 12px;
     margin-bottom: 20px;
 }
 
 .search-input-group input {
     flex: 1;
-    padding: 10px 12px;
-    background: #23272a;
-    border: 1px solid #4a4c52;
-    border-radius: 4px;
-    color: #ffffff;
+    padding: 10px 14px;
+    background: #13131a;
+    border: 1px solid #2a2a30;
+    border-radius: 8px;
+    color: #e0e0e8;
     font-size: 14px;
-    transition: all 0.2s;
 }
 
 .search-input-group input:focus {
     outline: none;
-    border-color: #7289da;
+    border-color: #5865f2;
 }
 
 .search-button {
-    padding: 10px 20px;
-    background: #7289da;
+    padding: 10px 24px;
+    background: #5865f2;
     border: none;
-    border-radius: 4px;
+    border-radius: 8px;
     color: white;
     cursor: pointer;
     font-weight: 500;
@@ -123,7 +100,7 @@
 }
 
 .search-button:hover:not(:disabled) {
-    background: #5b6eae;
+    background: #4752c4;
 }
 
 .search-button:disabled {
@@ -131,26 +108,18 @@
     cursor: not-allowed;
 }
 
-.error-message {
-    background: #f04747;
-    color: white;
-    padding: 10px;
-    border-radius: 4px;
-    margin-bottom: 20px;
-    font-size: 14px;
-}
-
 .guild-info {
-    background: #23272a;
-    border-radius: 8px;
+    background: #13131a;
+    border-radius: 12px;
     padding: 16px;
     margin-top: 20px;
+    border: 1px solid #2a2a30;
 }
 
 .guild-info h3 {
-    color: #ffffff;
+    color: #c0c0d0;
     margin: 0 0 12px 0;
-    font-size: 16px;
+    font-size: 14px;
 }
 
 .guild-details {
@@ -186,21 +155,21 @@
 }
 
 .guild-name {
-    color: #ffffff;
+    color: #e0e0e8;
     font-size: 18px;
     font-weight: 600;
     margin-bottom: 4px;
 }
 
 .guild-id {
-    color: #b9bbbe;
+    color: #8a8a9a;
     font-size: 12px;
     margin-bottom: 8px;
 }
 
 .guild-description {
-    color: #dcddde;
-    font-size: 14px;
+    color: #b0b0c0;
+    font-size: 13px;
     line-height: 1.4;
 }
 
@@ -209,7 +178,7 @@
     padding: 10px;
     background: #43b581;
     border: none;
-    border-radius: 4px;
+    border-radius: 8px;
     color: white;
     font-weight: 500;
     cursor: pointer;
@@ -226,17 +195,13 @@
 }
 
 @keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-    to {
-        opacity: 1;
-    }
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 @keyframes slideIn {
     from {
-        transform: translateY(-50px);
+        transform: translateY(-30px);
         opacity: 0;
     }
     to {

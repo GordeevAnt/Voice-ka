@@ -1,15 +1,34 @@
-/* Общие стили для всех страниц информации */
 .chanel-info-page,
 .room-info-page,
 .personal-acc-info-page {
-    padding: 20px;
+    padding: 24px;
     height: 100%;
     overflow-y: auto;
-    background: var(--bg-primary, #36393f);
-    color: var(--text-primary, #ffffff);
+    background: #0e0e12;
+    color: #e0e0e8;
 }
 
-/* Заголовок */
+/* Кастомный скроллбар */
+.chanel-info-page::-webkit-scrollbar,
+.room-info-page::-webkit-scrollbar,
+.personal-acc-info-page::-webkit-scrollbar {
+    width: 8px;
+}
+
+.chanel-info-page::-webkit-scrollbar-track,
+.room-info-page::-webkit-scrollbar-track,
+.personal-acc-info-page::-webkit-scrollbar-track {
+    background: #0a0a0e;
+    border-radius: 4px;
+}
+
+.chanel-info-page::-webkit-scrollbar-thumb,
+.room-info-page::-webkit-scrollbar-thumb,
+.personal-acc-info-page::-webkit-scrollbar-thumb {
+    background: #3a3a45;
+    border-radius: 4px;
+}
+
 .chanel-info-header,
 .room-info-header,
 .personal-info-header {
@@ -18,33 +37,31 @@
     gap: 20px;
     margin-bottom: 30px;
     padding-bottom: 20px;
-    border-bottom: 1px solid var(--border-color, #4f545c);
+    border-bottom: 1px solid #2a2a30;
 }
 
 .back-btn {
-    background: var(--bg-secondary, #2f3136);
+    background: #2a2a30;
     border: none;
-    color: var(--text-primary, #ffffff);
-    padding: 8px 16px;
+    color: #c0c0d0;
+    padding: 8px 20px;
     border-radius: 8px;
     cursor: pointer;
     font-size: 14px;
-    transition: background 0.2s;
+    transition: all 0.2s;
 }
 
 .back-btn:hover {
-    background: var(--bg-hover, #404249);
+    background: #3a3a40;
 }
 
-/* Загрузка и ошибки */
 .loading-container,
 .error-container {
     display: flex;
     justify-content: center;
     align-items: center;
     height: 100%;
-    font-size: 18px;
-    color: var(--text-secondary, #b9bbbe);
+    color: #8a8a9a;
 }
 
 .error-container {
@@ -52,14 +69,13 @@
     gap: 20px;
 }
 
-/* Информация о канале */
 .chanel-main-info {
     display: flex;
     gap: 30px;
     margin-bottom: 40px;
-    padding: 20px;
-    background: var(--bg-secondary, #2f3136);
-    border-radius: 12px;
+    padding: 24px;
+    background: #1a1a22;
+    border-radius: 16px;
 }
 
 .chanel-icon {
@@ -67,13 +83,7 @@
     height: 120px;
     border-radius: 50%;
     overflow: hidden;
-    background: var(--bg-tertiary, #202225);
-}
-
-.chanel-icon img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+    background: #2a2a30;
 }
 
 .default-icon {
@@ -84,103 +94,60 @@
     justify-content: center;
     font-size: 48px;
     font-weight: bold;
-    color: var(--text-primary, #ffffff);
-}
-
-.chanel-details {
-    flex: 1;
+    background: #5865f2;
+    color: white;
 }
 
 .chanel-details h2 {
-    margin: 0 0 10px 0;
+    margin: 0 0 12px 0;
     font-size: 28px;
 }
 
 .chanel-description {
-    color: var(--text-secondary, #b9bbbe);
-    margin-bottom: 15px;
+    color: #a0a0b0;
+    margin-bottom: 16px;
     line-height: 1.5;
 }
 
 .chanel-stats {
     display: flex;
-    gap: 20px;
-    margin-bottom: 20px;
-    color: var(--text-secondary, #b9bbbe);
-    font-size: 14px;
-}
-
-.invite-btn {
-    background: #5865f2;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 14px;
-    transition: background 0.2s;
-}
-
-.invite-btn:hover:not(:disabled) {
-    background: #4752c4;
-}
-
-.invite-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-/* Участники */
-.chanel-members-section,
-.room-users-section,
-.user-guilds-section {
-    margin-top: 30px;
+    gap: 24px;
+    color: #8a8a9a;
+    font-size: 13px;
 }
 
 .chanel-members-section h3,
-.room-users-section h3,
-.user-guilds-section h3 {
-    margin-bottom: 20px;
-    font-size: 20px;
+.room-users-section h3 {
+    margin-bottom: 16px;
+    font-size: 18px;
 }
 
-.members-list,
-.users-list {
+.members-list {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
 }
 
-.member-item,
-.user-item {
+.member-item {
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 16px;
     padding: 12px;
-    background: var(--bg-secondary, #2f3136);
-    border-radius: 8px;
+    background: #1a1a22;
+    border-radius: 12px;
     transition: background 0.2s;
 }
 
-.member-item:hover,
-.user-item:hover {
-    background: var(--bg-hover, #404249);
+.member-item:hover {
+    background: #22222a;
 }
 
-.member-avatar,
-.user-avatar {
+.member-avatar {
     width: 40px;
     height: 40px;
     border-radius: 50%;
     overflow: hidden;
-    background: var(--bg-tertiary, #202225);
-}
-
-.member-avatar img,
-.user-avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+    background: #2a2a30;
 }
 
 .avatar-placeholder {
@@ -189,21 +156,19 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 18px;
+    background: #5865f2;
+    color: white;
     font-weight: bold;
-    color: var(--text-primary, #ffffff);
 }
 
-.member-info,
-.user-info {
+.member-info {
     flex: 1;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
 }
 
-.member-name,
-.user-name {
+.member-name {
     font-weight: 500;
 }
 
@@ -217,49 +182,20 @@
 
 .member-joined {
     font-size: 12px;
-    color: var(--text-secondary, #b9bbbe);
+    color: #6a6a7a;
 }
 
-/* Статусы пользователей */
-.user-status {
-    display: flex;
-    gap: 5px;
-    margin-left: 10px;
-}
-
-.badge {
-    font-size: 11px;
-    padding: 2px 6px;
-    border-radius: 4px;
-}
-
-.badge.muted {
-    background: #faa61a;
-    color: #000;
-}
-
-.badge.deafened {
-    background: #f04747;
-    color: #fff;
-}
-
-.badge.streaming {
-    background: #593695;
-    color: #fff;
-}
-
-/* Детали комнаты */
 .room-details {
-    background: var(--bg-secondary, #2f3136);
-    border-radius: 12px;
-    padding: 20px;
+    background: #1a1a22;
+    border-radius: 16px;
+    padding: 24px;
     margin-bottom: 30px;
 }
 
 .detail-item {
-    margin-bottom: 15px;
-    padding-bottom: 15px;
-    border-bottom: 1px solid var(--border-color, #4f545c);
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #2a2a30;
 }
 
 .detail-item:last-child {
@@ -270,16 +206,16 @@
 
 .detail-item label {
     display: block;
-    font-size: 12px;
-    color: var(--text-secondary, #b9bbbe);
-    margin-bottom: 5px;
+    font-size: 11px;
+    color: #6a6a7a;
+    margin-bottom: 4px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
 .detail-item p {
     margin: 0;
-    font-size: 16px;
+    font-size: 15px;
 }
 
 .room-type-badge {
@@ -287,23 +223,7 @@
     background: #5865f2;
     padding: 4px 12px;
     border-radius: 6px;
-    font-size: 14px;
-}
-
-/* Формы редактирования */
-.edit-room-form,
-.edit-profile-form {
-    background: var(--bg-secondary, #2f3136);
-    border-radius: 12px;
-    padding: 25px;
-    max-width: 600px;
-    margin: 0 auto;
-}
-
-.edit-room-form h3,
-.edit-profile-form h3 {
-    margin-bottom: 25px;
-    font-size: 24px;
+    font-size: 13px;
 }
 
 .form-group {
@@ -320,11 +240,11 @@
 .form-group textarea,
 .form-group select {
     width: 100%;
-    padding: 10px;
-    background: var(--bg-tertiary, #202225);
-    border: 1px solid var(--border-color, #4f545c);
-    border-radius: 6px;
-    color: var(--text-primary, #ffffff);
+    padding: 10px 12px;
+    background: #13131a;
+    border: 1px solid #2a2a30;
+    border-radius: 8px;
+    color: #e0e0e8;
     font-size: 14px;
 }
 
@@ -335,65 +255,53 @@
     border-color: #5865f2;
 }
 
-.form-group textarea {
-    resize: vertical;
-    font-family: inherit;
-}
-
-.form-group small {
-    display: block;
-    margin-top: 5px;
-    font-size: 12px;
-    color: var(--text-secondary, #b9bbbe);
-}
-
-.form-divider {
-    margin: 20px 0;
-    padding-top: 20px;
-    border-top: 1px solid var(--border-color, #4f545c);
-    font-weight: bold;
-    color: var(--text-secondary, #b9bbbe);
-}
-
-.form-buttons,
-.modal-buttons,
-.room-actions {
+.form-buttons {
     display: flex;
-    gap: 10px;
-    margin-top: 25px;
-}
-
-.save-btn,
-.edit-btn {
-    background: #5865f2;
-    color: white;
-}
-
-.delete-btn,
-.cancel-btn {
-    background: #f04747;
-    color: white;
+    gap: 12px;
+    margin-top: 24px;
 }
 
 .save-btn, .edit-btn, .delete-btn, .cancel-btn {
-    padding: 10px 20px;
+    padding: 10px 24px;
     border: none;
     border-radius: 8px;
     cursor: pointer;
     font-size: 14px;
-    transition: opacity 0.2s;
+    transition: all 0.2s;
 }
 
-.save-btn:hover, .edit-btn:hover, .delete-btn:hover, .cancel-btn:hover {
-    opacity: 0.9;
+.save-btn, .edit-btn {
+    background: #5865f2;
+    color: white;
 }
 
-/* Статистика пользователя */
+.save-btn:hover, .edit-btn:hover {
+    background: #4752c4;
+}
+
+.delete-btn {
+    background: #e81123;
+    color: white;
+}
+
+.delete-btn:hover {
+    background: #c40f1c;
+}
+
+.cancel-btn {
+    background: #2a2a30;
+    color: #c0c0d0;
+}
+
+.cancel-btn:hover {
+    background: #3a3a40;
+}
+
 .user-profile-header {
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin-bottom: 30px;
+    margin-bottom: 32px;
 }
 
 .user-avatar-large {
@@ -401,14 +309,8 @@
     height: 120px;
     border-radius: 50%;
     overflow: hidden;
-    background: var(--bg-tertiary, #202225);
-    margin-bottom: 15px;
-}
-
-.user-avatar-large img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+    background: #2a2a30;
+    margin-bottom: 16px;
 }
 
 .avatar-placeholder-large {
@@ -417,46 +319,21 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    background: #5865f2;
+    color: white;
     font-size: 48px;
     font-weight: bold;
-}
-
-.user-status-indicator {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.status-dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-}
-
-.user-info-section {
-    text-align: center;
-    margin-bottom: 40px;
-}
-
-.user-info-section h2 {
-    margin: 0 0 5px 0;
-    font-size: 28px;
-}
-
-.user-email {
-    color: var(--text-secondary, #b9bbbe);
-    margin-bottom: 25px;
 }
 
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 20px;
-    margin: 30px 0;
+    gap: 16px;
+    margin: 24px 0;
 }
 
 .stat-card {
-    background: var(--bg-secondary, #2f3136);
+    background: #1a1a22;
     padding: 20px;
     border-radius: 12px;
     text-align: center;
@@ -466,86 +343,23 @@
     font-size: 32px;
     font-weight: bold;
     margin-bottom: 8px;
+    color: #e0e0e8;
 }
 
 .stat-label {
-    font-size: 14px;
-    color: var(--text-secondary, #b9bbbe);
+    font-size: 13px;
+    color: #8a8a9a;
 }
 
 .info-row {
     display: flex;
     justify-content: space-between;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--border-color, #4f545c);
+    padding: 12px 0;
+    border-bottom: 1px solid #2a2a30;
 }
 
 .info-row label {
-    color: var(--text-secondary, #b9bbbe);
-}
-
-/* Каналы пользователя */
-.guilds-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 15px;
-}
-
-.guild-card {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    padding: 15px;
-    background: var(--bg-secondary, #2f3136);
-    border-radius: 8px;
-    transition: background 0.2s;
-}
-
-.guild-card:hover {
-    background: var(--bg-hover, #404249);
-}
-
-.guild-icon {
-    width: 50px;
-    height: 50px;
-    border-radius: 12px;
-    overflow: hidden;
-    background: var(--bg-tertiary, #202225);
-}
-
-.guild-icon img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.guild-icon-placeholder {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    font-weight: bold;
-}
-
-.guild-info {
-    flex: 1;
-}
-
-.guild-name {
-    font-weight: 500;
-    margin-bottom: 5px;
-}
-
-.guild-role {
-    font-size: 12px;
-    color: var(--text-secondary, #b9bbbe);
-}
-
-.profile-actions {
-    text-align: center;
-    margin-top: 30px;
+    color: #8a8a9a;
 }
 
 .edit-profile-btn {
@@ -555,47 +369,11 @@
     border: none;
     border-radius: 8px;
     cursor: pointer;
-    font-size: 16px;
-    transition: background 0.2s;
+    font-size: 14px;
+    transition: all 0.2s;
+    margin-top: 24px;
 }
 
 .edit-profile-btn:hover {
     background: #4752c4;
-}
-
-/* Модальное окно */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-}
-
-.modal-content {
-    background: var(--bg-primary, #36393f);
-    padding: 25px;
-    border-radius: 12px;
-    min-width: 400px;
-    max-width: 90%;
-}
-
-.modal-content h3 {
-    margin-bottom: 20px;
-}
-
-.invite-link {
-    width: 100%;
-    padding: 10px;
-    background: var(--bg-secondary, #2f3136);
-    border: 1px solid var(--border-color, #4f545c);
-    border-radius: 6px;
-    color: var(--text-primary, #ffffff);
-    margin: 15px 0;
-    font-family: monospace;
 }
