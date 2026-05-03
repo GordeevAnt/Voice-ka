@@ -140,7 +140,7 @@ export function Rooms_Online_List({ guildId }: RoomsOnlineListProps) {
 
     return (
         <div className="rooms-online-list-block">
-            <div className="online-users-header">Онлайн ({onlineUsers.length})</div>
+            <></>
             <div className="rooms-online-list">
                 {onlineUsers.length === 0 ? (
                     <div className="no-online-users">Нет пользователей в сети</div>
