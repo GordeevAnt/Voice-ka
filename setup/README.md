@@ -32,7 +32,7 @@ reset.bat - перезапускает контейнер
 
 # Команды приложения
 
-1) npm run tauri dev   - запуск клиентского приложения
-2) npm run test        - включить тестирование
-3) cargo run migration - провести миграцию
-4) cargo run server    - запустить сервер
+1) npm run tauri dev      - запуск клиентского приложения
+2) npm run test           - включить тестирование
+3) cargo run -- --migrate - провести миграцию
+4) cargo run server       - запустить сервер
