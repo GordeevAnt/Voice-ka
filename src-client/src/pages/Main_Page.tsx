@@ -90,7 +90,7 @@ export function Main_Page() {
                 <div className="main-container">
                     <div className="welcome-placeholder">
                         <h2>Добро пожаловать!</h2>
-                        <p>Выберите канал слева</p>
+                        <p>Выберите канал внизу</p>
                     </div>
                 </div>
                 <Chanels_List 

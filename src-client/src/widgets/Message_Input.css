@@ -1,6 +1,7 @@
 .message-input-container {
     min-height: 44px;
     flex-shrink: 0;
+    padding-right: 14px;
 }
 
 .message-input-block {
@@ -14,7 +15,7 @@
 }
 
 #message-input {
-    flex: 1;
+    width: 100%;
     background: #13131a;
     border: 1px solid #2a2a30;
     padding: 10px 14px;

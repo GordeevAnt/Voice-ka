@@ -232,7 +232,7 @@ export function Personal_Account_Info_Page() {
                         </div>
 
                         <div className="user-info-section">
-                            <h2>{user.username}</h2>
+                            <h2 className="nickname">{user.username}</h2>
                             
                             <div className="stats-grid">
                                 <div className="stat-card">

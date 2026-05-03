@@ -27,7 +27,10 @@ export const Messages_List = memo(({ roomId, currentUserId, wsMessage }: Message
     const [messages, setMessages] = useState<MessageType[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [hasScrollbar, setHasScrollbar] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const messagesListBlockRef = useRef<HTMLDivElement>(null);
+    const messagesListRef = useRef<HTMLDivElement>(null);
 
     const loadMessages = useCallback(async () => {
         if (!roomId) return;
@@ -99,6 +102,32 @@ export const Messages_List = memo(({ roomId, currentUserId, wsMessage }: Message
         }
     }, [wsMessage]);
 
+    // Проверка наличия скроллбара
+    const checkScrollbar = useCallback(() => {
+        const block = messagesListBlockRef.current;
+        if (block) {
+            const hasVerticalScrollbar = block.scrollHeight > block.clientHeight;
+            setHasScrollbar(hasVerticalScrollbar);
+        }
+    }, []);
+
+    // Проверяем при изменении сообщений и после загрузки
+    useEffect(() => {
+        if (!loading) {
+            // Небольшая задержка для корректного расчета после рендера
+            const timeoutId = setTimeout(() => {
+                checkScrollbar();
+            }, 100);
+            return () => clearTimeout(timeoutId);
+        }
+    }, [loading, messages, checkScrollbar]);
+
+    // Проверяем при изменении размера окна
+    useEffect(() => {
+        window.addEventListener('resize', checkScrollbar);
+        return () => window.removeEventListener('resize', checkScrollbar);
+    }, [checkScrollbar]);
+
     if (loading) {
         return (
             <div className="messages-list-block">
@@ -119,8 +148,14 @@ export const Messages_List = memo(({ roomId, currentUserId, wsMessage }: Message
     }
 
     return (
-        <div className="messages-list-block">
-            <div className="messages-list">
+        <div 
+            className={`messages-list-block ${hasScrollbar ? 'has-scrollbar' : ''}`}
+            ref={messagesListBlockRef}
+        >
+            <div 
+                className={`messages-list ${hasScrollbar ? 'has-scrollbar' : ''}`}
+                ref={messagesListRef}
+            >
                 {messages.length === 0 ? (
                     <div className="messages-empty">Нет сообщений. Напишите первое сообщение!</div>
                 ) : (

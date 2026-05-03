@@ -27,6 +27,10 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+}
+
+/* Стиль когда есть скроллбар */
+.messages-list.has-scrollbar {
     padding-right: 8px;
 }
 

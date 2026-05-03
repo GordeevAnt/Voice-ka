@@ -17,7 +17,7 @@
 7)  Перейти в Voice-ka/src-client
 8)  Прописать в консоль (Command Prompt) "npm run tauri dev" столько раз,
     сколько нужно экземпляров клиентского приложения
-9)  Перейти в Voice-ka/src-server/src
+9)  Перейти в Voice-ka/src-server
 10) Прописать в консоль (Powershell) "cargo run server" для запуска сервера
 
 # Последующие запуски
