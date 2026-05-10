@@ -19,11 +19,7 @@
 .search-chanel-btn img {
     width: 22px;
     height: 22px;
-    filter: invert(0.6);
-}
-
-.search-chanel-btn:hover img {
-    filter: invert(1);
+    filter: invert(0.1);
 }
 
 .modal-header {
