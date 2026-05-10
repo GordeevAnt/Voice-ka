@@ -107,7 +107,7 @@ export function Room_Info_Page() {
         return (
             <div className="room-info-page">
                 <div className="error-container">
-                    <h2>Комната не найдена</h2>
+                    <h2>Комната не выбрана</h2>
                     <button onClick={() => navigate('/main')}>Вернуться назад</button>
                 </div>
             </div>

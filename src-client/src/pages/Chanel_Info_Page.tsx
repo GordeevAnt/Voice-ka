@@ -94,7 +94,7 @@ export function Chanel_Info_Page() {
         return (
             <div className="chanel-info-page">
                 <div className="error-container">
-                    <h2>Канал не найден</h2>
+                    <h2>Канал не выбран</h2>
                     <button onClick={handleBack}>Вернуться назад</button>
                 </div>
             </div>

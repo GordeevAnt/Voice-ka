@@ -1,5 +1,7 @@
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { useState, useEffect } from "react"
+import { apiService } from "../features/api.service"
+import { storeAPI } from "../features/useStore"
 
 import "./Header.css"
 
@@ -10,6 +12,7 @@ import "./Header.css"
 export function Header() {
     const appWindow = getCurrentWindow();
     const [isMaximized, setIsMaximized] = useState(false);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
 
     useEffect(() => {
         // Проверяем текущее состояние окна при загрузке
@@ -42,6 +45,43 @@ export function Header() {
         setIsMaximized(maximized);
     };
 
+    const handleClose = async () => {
+        if (isLoggingOut) return; // Предотвращаем повторные вызовы
+        
+        setIsLoggingOut(true);
+        
+        try {
+            // Получаем данные пользователя
+            const userId = await storeAPI.get<number>('user_id');
+            const sessionId = await storeAPI.get<string>('session_id');
+            
+            console.log('Closing app: Logging out user', { userId, sessionId });
+            
+            // Выполняем выход, если пользователь авторизован
+            if (userId) {
+                await apiService.logout(userId, sessionId || null);
+            } else {
+                // Если нет данных о пользователе, просто очищаем хранилище
+                await storeAPI.clear();
+            }
+            
+            // Небольшая задержка для завершения WebSocket операций
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+        } catch (error) {
+            console.error("Error during logout on app close:", error);
+            // В случае ошибки все равно очищаем хранилище
+            try {
+                await storeAPI.clear();
+            } catch (clearError) {
+                console.error("Error clearing store:", clearError);
+            }
+        } finally {
+            // Закрываем окно после завершения операций выхода
+            await appWindow.close();
+        }
+    };
+
     return (
         <div className="titlebar" data-tauri-drag-region>
             
@@ -70,7 +110,12 @@ export function Header() {
                     />
                 </button>
                 
-                <button className="titlebar-btn close" id="titlebar-close" onClick={() => appWindow.close()}>
+                <button 
+                    className="titlebar-btn close" 
+                    id="titlebar-close" 
+                    onClick={handleClose}
+                    disabled={isLoggingOut}
+                >
                     <img src="/close.svg" alt="Close" />
                 </button>
             
