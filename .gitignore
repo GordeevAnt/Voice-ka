@@ -4,22 +4,41 @@
 /target/
 **/target/
 */target/
+src-tauri/target/
+src-server/target/
+Cargo.lock
 
-# Node.js
+# Node.js / Tauri frontend
 node_modules/
 dist/
 dist-ssr/
 *.local
-
-# Логи
-*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
 
-# Редакторы
+# Tauri специфичные
+src-tauri/gen/
+src-tauri/target/
+src-tauri/.cargo/
+
+# Webview (если есть)
+build/
+.webpack/
+
+# Логи
+*.log
+logs/
+*.pid
+*.seed
+*.pid.lock
+
+# Редакторы и ОС
 .vscode/
 !.vscode/extensions.json
 .idea/
@@ -29,10 +48,90 @@ lerna-debug.log*
 *.njsproj
 *.sln
 *.sw?
+Thumbs.db
+*.swp
+*.swo
+*~
+.directory
 
-# Tauri
-src-client/src-tauri/target/
-src-client/src-tauri/gen/
-
-# Сборки
+# Сборки и временные файлы
 *.rs.bk
+*.rlib
+*.pdb
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.o
+*.d
+
+# Переменные окружения
+.env
+.env.local
+.env.*.local
+.env.*.production
+
+# Результаты тестов
+coverage/
+*.gcov
+*.gcno
+*.gcda
+
+# Авто-генерируемые файлы
+*.pb.rs
+*.proto.rs
+
+# Зависимости в кеше
+.cargo/
+.rustup/
+
+# Графики
+*.svg
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# Архивы
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Docker
+*.pid
+docker-compose.override.yml
+
+# VS Code
+.history/
+*.code-workspace
+
+# IntelliJ IDEA
+.idea/
+*.iml
+out/
+.idea_modules/
+
+# Sublime Text
+*.tmlanguage.cache
+*.tmPreferences.cache
+*.tmTheme.cache
+*.sublime-workspace
+*.sublime-project
+
+# Vim
+*.un~
+.vim/
+
+# Windows
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
