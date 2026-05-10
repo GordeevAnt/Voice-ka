@@ -474,3 +474,70 @@ pub async fn handle_get_user_permissions_in_guild(
 
     Ok(permissions)
 }
+
+#[derive(Debug, serde::Deserialize)]
+pub struct UpdateGuildData {
+    pub name: String,
+    pub description: Option<String>,
+    pub icon: Option<String>,
+}
+
+pub async fn handle_update_guild(
+    user_id: i32,
+    guild_id: i32,
+    data: UpdateGuildData,
+    manager: Arc<SubscriptionManager>,
+) -> Result<serde_json::Value, String> {
+    let pool = get_db_pool();
+
+    // Проверяем права пользователя
+    let permissions = handle_get_user_permissions_in_guild(user_id, guild_id).await?;
+    let has_edit_guild = (permissions & 2) != 0; // EDIT_GUILD = 2
+
+    if !has_edit_guild {
+        return Err("You don't have permission to edit this guild".to_string());
+    }
+
+    let now = Utc::now();
+
+    let guild_row = sqlx::query(
+        "UPDATE guilds 
+         SET name = $1, description = $2, icon = $3, updated_at = $4
+         WHERE id = $5
+         RETURNING id, name, icon, owner_id, description"
+    )
+    .bind(&data.name)
+    .bind(&data.description)
+    .bind(&data.icon)
+    .bind(now)
+    .bind(guild_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| format!("Failed to update guild: {}", e))?;
+
+    match guild_row {
+        Some(row) => {
+            let id: i32 = row.get(0);
+            let name: String = row.get(1);
+            let icon: Option<String> = row.get(2);
+            let owner_id: i32 = row.get(3);
+            let description: Option<String> = row.get(4);
+            
+            let result = json!({
+                "id": id,
+                "name": name,
+                "icon": icon,
+                "owner_id": owner_id,
+                "description": description
+            });
+
+            // Уведомляем всех в гильдии об обновлении
+            let ws_msg = WsMessage::new("guild_updated", result.clone())
+                .with_guild(guild_id);
+            manager.broadcast_to_guild(guild_id, ws_msg).await;
+
+            Ok(result)
+        }
+        None => Err("Guild not found".to_string())
+    }
+}

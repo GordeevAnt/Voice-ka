@@ -136,6 +136,17 @@ class ApiService {
         }
     }
 
+    async updateGuild(guildId: number, data: { name: string; description?: string | null; icon?: string | null }): Promise<any> {
+        try {
+            await wsService.waitForAuth();
+            const result = await wsService.request('update_guild', data, { guild_id: guildId });
+            return result.guild;
+        } catch (err) {
+            console.error('Update guild error:', err);
+            throw err;
+        }
+    }
+
     async findGuildById(guildId: number): Promise<any | null> {
         try {
             await wsService.waitForAuth();
@@ -201,6 +212,17 @@ class ApiService {
             return result.room;
         } catch (err) {
             console.error('Create room error:', err);
+            throw err;
+        }
+    }
+
+    async updateRoom(roomId: number, data: { name: string; topic?: string | null; bitrate?: number; user_limit?: number }): Promise<any> {
+        try {
+            await wsService.waitForAuth();
+            const result = await wsService.request('update_room', data, { room_id: roomId });
+            return result.room;
+        } catch (err) {
+            console.error('Update room error:', err);
             throw err;
         }
     }

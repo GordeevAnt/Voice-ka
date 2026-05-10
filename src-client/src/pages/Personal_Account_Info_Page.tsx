@@ -144,16 +144,34 @@ export function Personal_Account_Info_Page() {
             const success = await apiService.updateUserProfile(userId, {
                 username: editData.username,
                 email: editData.email,
+                avatar: user?.avatar,
                 currentPassword: editData.currentPassword || null,
                 newPassword: editData.newPassword || null
             });
             
             if (success) {
-                alert("Профиль успешно обновлен!");
-                setIsEditing(false);
+                
+                // Обновляем локальное состояние
+                setUser(prev => prev ? {
+                    ...prev,
+                    username: editData.username,
+                    email: editData.email
+                } : null);
                 
                 await storeAPI.set('username', editData.username);
-                loadUserInfo();
+                
+                setIsEditing(false);
+                setEditData({
+                    username: editData.username,
+                    email: editData.email,
+                    currentPassword: "",
+                    newPassword: "",
+                    confirmPassword: ""
+                });
+                
+                // Перезагружаем данные
+                await loadUserInfo();
+                await loadUserStats();
             } else {
                 alert("Ошибка обновления профиля");
             }
@@ -212,24 +230,26 @@ export function Personal_Account_Info_Page() {
             <div className="personal-info-content">
                 {!isEditing ? (
                     <>
-                        <div className="user-profile-header">
-                            <div className="user-avatar-large">
-                                {user.avatar ? (
-                                    <img src={user.avatar} alt={user.username} />
-                                ) : (
-                                    <div className="avatar-placeholder-large">
-                                        {user.username[0]?.toUpperCase()}
-                                    </div>
-                                )}
+                        <>
+                            <div className="user-profile-header">
+                                <div className="user-avatar-large">
+                                    {user.avatar ? (
+                                        <img src={user.avatar} alt={user.username} />
+                                    ) : (
+                                        <div className="avatar-placeholder-large">
+                                            {user.username[0]?.toUpperCase()}
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="user-status-indicator">
+                                    <span 
+                                        className="status-dot"
+                                        style={{ backgroundColor: getStatusColor(user.status) }}
+                                    />
+                                    <span className="status-text">{getStatusText(user.status)}</span>
+                                </div>
                             </div>
-                            <div className="user-status-indicator">
-                                <span 
-                                    className="status-dot"
-                                    style={{ backgroundColor: getStatusColor(user.status) }}
-                                />
-                                <span className="status-text">{getStatusText(user.status)}</span>
-                            </div>
-                        </div>
+                        </>
 
                         <div className="user-info-section">
                             <h2 className="nickname">{user.username}</h2>

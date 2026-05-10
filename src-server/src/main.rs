@@ -329,10 +329,57 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                             }
                                         }
 
+                                        "update_guild" => {
+                                            if let (Some(uid), Some(guild_id), Some(data)) = (current_user_id, client_msg.guild_id, client_msg.data) {
+                                                if uid > 0 {
+                                                    if let Ok(update_data) = serde_json::from_value::<handlers::guild::UpdateGuildData>(data) {
+                                                        match handlers::guild::handle_update_guild(uid, guild_id, update_data, manager.clone()).await {
+                                                            Ok(guild) => {
+                                                                let resp = WsMessage::success_response(request_id, json!({ "guild": guild }));
+                                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                    serde_json::to_string(&resp).unwrap()
+                                                                ));
+                                                            }
+                                                            Err(e) => {
+                                                                let resp = WsMessage::error_response(request_id, &e);
+                                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                    serde_json::to_string(&resp).unwrap()
+                                                                ));
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Обновление комнаты
+                                        "update_room" => {
+                                            if let (Some(uid), Some(room_id), Some(data)) = (current_user_id, client_msg.room_id, client_msg.data) {
+                                                if uid > 0 {
+                                                    if let Ok(update_data) = serde_json::from_value::<handlers::room::UpdateRoomData>(data) {
+                                                        match handlers::room::handle_update_room(uid, room_id, update_data, manager.clone()).await {
+                                                            Ok(room) => {
+                                                                let resp = WsMessage::success_response(request_id, json!({ "room": room }));
+                                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                    serde_json::to_string(&resp).unwrap()
+                                                                ));
+                                                            }
+                                                            Err(e) => {
+                                                                let resp = WsMessage::error_response(request_id, &e);
+                                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                    serde_json::to_string(&resp).unwrap()
+                                                                ));
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
                                         "update_user_profile" => {
                                             if let (Some(uid), Some(data)) = (current_user_id, client_msg.data) {
                                                 if uid > 0 {
-                                                    match handlers::auth::handle_update_user_profile(uid, data).await {
+                                                    match handlers::auth::handle_update_user_profile(uid, data, manager.clone()).await {
                                                         Ok(success) => {
                                                             let resp = WsMessage::success_response(request_id, json!({ "success": success }));
                                                             let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(

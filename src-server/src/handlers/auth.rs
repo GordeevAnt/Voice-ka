@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::db::get_db_pool;
 use crate::ws::manager::{ConnectionInfo, SubscriptionManager};
+use crate::ws::messages::WsMessage;
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
@@ -537,18 +538,22 @@ pub async fn handle_get_user_stats(user_id: i32) -> Result<serde_json::Value, St
 
 pub async fn handle_update_user_profile(
     user_id: i32, 
-    data: serde_json::Value
+    data: serde_json::Value,
+    manager: Arc<SubscriptionManager>,
 ) -> Result<bool, String> {
     let pool = get_db_pool();
     
     let username = data.get("username").and_then(|v| v.as_str());
     let email = data.get("email").and_then(|v| v.as_str());
+    let avatar = data.get("avatar").and_then(|v| v.as_str());
     let current_password = data.get("currentPassword").and_then(|v| v.as_str());
     let new_password = data.get("newPassword").and_then(|v| v.as_str());
     
     let mut transaction = pool.begin()
         .await
         .map_err(|e| e.to_string())?;
+    
+    let mut updated = false;
     
     // Если меняется пароль, проверяем текущий
     if let (Some(current), Some(new)) = (current_password, new_password) {
@@ -585,11 +590,12 @@ pub async fn handle_update_user_profile(
                 .execute(&mut *transaction)
                 .await
                 .map_err(|e| e.to_string())?;
+                updated = true;
             }
         }
     }
     
-    // Обновляем username и email
+    // Обновляем username
     if let Some(uname) = username {
         if !uname.is_empty() && uname.len() >= 3 {
             sqlx::query(
@@ -601,9 +607,11 @@ pub async fn handle_update_user_profile(
             .execute(&mut *transaction)
             .await
             .map_err(|e| e.to_string())?;
+            updated = true;
         }
     }
     
+    // Обновляем email
     if let Some(em) = email {
         if !em.is_empty() && em.contains('@') {
             sqlx::query(
@@ -615,12 +623,62 @@ pub async fn handle_update_user_profile(
             .execute(&mut *transaction)
             .await
             .map_err(|e| e.to_string())?;
+            updated = true;
         }
+    }
+    
+    // Обновляем avatar
+    if let Some(av) = avatar {
+        sqlx::query(
+            "UPDATE users SET avatar = $1, updated_at = $2 WHERE id = $3"
+        )
+            .bind(av)
+            .bind(Utc::now())
+            .bind(user_id)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|e| e.to_string())?;
+        updated = true;
     }
     
     transaction.commit()
         .await
         .map_err(|e| e.to_string())?;
+    
+    // Если были изменения, уведомляем об обновлении профиля
+    if updated {
+        // Получаем обновленные данные пользователя
+        let user_row = sqlx::query(
+            "SELECT username, avatar, status FROM users WHERE id = $1"
+        )
+        .bind(user_id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+        
+        if let Some(row) = user_row {
+            let username: String = row.get(0);
+            let avatar: Option<String> = row.get(1);
+            let status: String = row.get(2);
+            
+            // Получаем гильдии пользователя
+            let guild_ids = crate::handlers::guild::get_user_guilds_ids(user_id).await?;
+            
+            // Уведомляем всех в гильдиях об обновлении профиля
+            let profile_data = json!({
+                "user_id": user_id,
+                "username": username,
+                "avatar": avatar,
+                "status": status
+            });
+            
+            for guild_id in guild_ids {
+                let ws_msg = WsMessage::new("user_profile_updated", profile_data.clone())
+                    .with_guild(guild_id);
+                manager.broadcast_to_guild(guild_id, ws_msg).await;
+            }
+        }
+    }
     
     Ok(true)
 }

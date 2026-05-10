@@ -214,3 +214,96 @@ pub async fn handle_get_room_by_id(room_id: i32) -> Result<serde_json::Value, St
         None => Err("Room not found".to_string())
     }
 }
+
+#[derive(Debug, serde::Deserialize)]
+pub struct UpdateRoomData {
+    pub name: String,
+    pub topic: Option<String>,
+    pub bitrate: Option<i32>,
+    pub user_limit: Option<i32>,
+}
+
+pub async fn handle_update_room(
+    user_id: i32,
+    room_id: i32,
+    data: UpdateRoomData,
+    manager: Arc<SubscriptionManager>,
+) -> Result<serde_json::Value, String> {
+    let pool = get_db_pool();
+
+    // Получаем guild_id комнаты
+    let guild_id: Option<i32> = sqlx::query_scalar(
+        "SELECT guild_id FROM rooms WHERE id = $1"
+    )
+    .bind(room_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| format!("Failed to get room: {}", e))?;
+
+    let guild_id = match guild_id {
+        Some(id) => id,
+        None => return Err("Room not found".to_string()),
+    };
+
+    // Проверяем права пользователя
+    let permissions = crate::handlers::guild::handle_get_user_permissions_in_guild(user_id, guild_id).await?;
+    let has_edit_rooms = (permissions & 8) != 0; // EDIT_ROOMS = 8
+
+    if !has_edit_rooms {
+        return Err("You don't have permission to edit this room".to_string());
+    }
+
+    let now = Utc::now();
+
+    let room_row = sqlx::query(
+        "UPDATE rooms 
+         SET name = $1, topic = $2, bitrate = $3, user_limit = $4, updated_at = $5
+         WHERE id = $6
+         RETURNING id, name, type, topic, position, bitrate, user_limit, created_at, updated_at"
+    )
+    .bind(&data.name)
+    .bind(&data.topic)
+    .bind(data.bitrate)
+    .bind(data.user_limit)
+    .bind(now)
+    .bind(room_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| format!("Failed to update room: {}", e))?;
+
+    match room_row {
+        Some(row) => {
+            let id: i32 = row.get(0);
+            let name: String = row.get(1);
+            let room_type: String = row.get(2);
+            let topic: Option<String> = row.get(3);
+            let position: i32 = row.get(4);
+            let bitrate: Option<i32> = row.get(5);
+            let user_limit: Option<i32> = row.get(6);
+            let created_at: chrono::DateTime<chrono::Utc> = row.get(7);
+            let updated_at: chrono::DateTime<chrono::Utc> = row.get(8);
+            
+            let result = json!({
+                "id": id,
+                "name": name,
+                "type": room_type,
+                "guild_id": guild_id,
+                "topic": topic,
+                "position": position,
+                "bitrate": bitrate,
+                "user_limit": user_limit,
+                "created_at": created_at.to_rfc3339(),
+                "updated_at": updated_at.to_rfc3339(),
+                "member_count": 0
+            });
+
+            // Уведомляем всех в гильдии об обновлении комнаты
+            let ws_msg = WsMessage::new("room_updated", result.clone())
+                .with_guild(guild_id);
+            manager.broadcast_to_guild(guild_id, ws_msg).await;
+
+            Ok(result)
+        }
+        None => Err("Room not found".to_string())
+    }
+}

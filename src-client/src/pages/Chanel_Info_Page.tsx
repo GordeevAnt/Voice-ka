@@ -95,13 +95,20 @@ export function Chanel_Info_Page() {
         if (!guild || !editData.name.trim()) return;
         
         try {
-            // TODO: Добавить API метод для обновления гильдии
-            console.log("Saving guild edit:", editData);
-            setIsEditing(false);
-            await loadGuildInfo();
+            const updatedGuild = await apiService.updateGuild(guild.id, {
+                name: editData.name,
+                description: editData.description || null  // используем null вместо undefined
+            });
+            
+            if (updatedGuild) {
+                setGuild(updatedGuild);
+                setIsEditing(false);
+            } else {
+                alert("Ошибка при обновлении канала");
+            }
         } catch (err) {
             console.error("Error saving guild:", err);
-            alert("Ошибка сохранения");
+            alert(err instanceof Error ? err.message : "Ошибка сохранения");
         }
     };
 
@@ -135,9 +142,11 @@ export function Chanel_Info_Page() {
                 <h1>Информация о канале</h1>
                 {/* Показываем кнопку редактирования только если есть право */}
                 {hasEditGuild && !isEditing && (
-                    <button className="edit-btn" onClick={() => setIsEditing(true)}>
-                        Редактировать
-                    </button>
+                    <>
+                        <button className="edit-btn" onClick={() => setIsEditing(true)}>
+                            Редактировать
+                        </button>
+                    </>
                 )}
             </div>
 

@@ -7,4 +7,4 @@ pub mod room;
 pub use auth::*;
 pub use guild::*;
 // pub use message::*;
-// pub use room::*;
+pub use room::*;

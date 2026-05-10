@@ -103,13 +103,22 @@ export function Room_Info_Page() {
         if (!room || !editData.name.trim()) return;
         
         try {
-            // TODO: Добавить API метод для обновления комнаты
-            console.log("Saving room edit:", editData);
-            setIsEditing(false);
-            await loadRoomInfo();
+            const updatedRoom = await apiService.updateRoom(room.id, {
+                name: editData.name,
+                topic: editData.topic || null,  // используем null вместо undefined
+                bitrate: room.room_type === 'voice' ? editData.bitrate : undefined,
+                user_limit: room.room_type === 'voice' ? editData.user_limit : 0
+            });
+            
+            if (updatedRoom) {
+                setRoom(updatedRoom);
+                setIsEditing(false);
+            } else {
+                alert("Ошибка при обновлении комнаты");
+            }
         } catch (err) {
             console.error("Error saving room:", err);
-            alert("Ошибка сохранения");
+            alert(err instanceof Error ? err.message : "Ошибка сохранения");
         }
     };
 
@@ -185,11 +194,6 @@ export function Room_Info_Page() {
                                     </div>
                                 </>
                             )}
-                            
-                            <div className="detail-item">
-                                <label>Участников онлайн:</label>
-                                <p>{room.member_count || 0}</p>
-                            </div>
                         </div>
 
                         {users.length > 0 && (
