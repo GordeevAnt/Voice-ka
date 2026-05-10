@@ -416,3 +416,61 @@ pub async fn handle_get_user_guilds_with_role(user_id: i32) -> Result<Vec<serde_
 }
 
 pub use get_user_guilds_ids as handle_get_user_guilds_ids;
+
+pub async fn handle_get_user_roles_in_guild(
+    user_id: i32, 
+    guild_id: i32
+) -> Result<Vec<serde_json::Value>, String> {
+    let pool = get_db_pool();
+
+    let roles = sqlx::query(
+        "SELECT r.id, r.name, r.permissions, r.color, r.position
+        FROM roles r
+        INNER JOIN member_roles mr ON r.id = mr.role_id
+        WHERE mr.user_id = $1 AND mr.guild_id = $2
+        ORDER BY r.position ASC"
+    )
+    .bind(user_id)
+    .bind(guild_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| format!("Failed to get user roles: {}", e))?;
+
+    Ok(roles.into_iter().map(|row| {
+        let id: i32 = row.get(0);
+        let name: String = row.get(1);
+        let permissions: i64 = row.get(2);
+        let color: Option<String> = row.get(3);
+        let position: i32 = row.get(4);
+        
+        json!({
+            "id": id,
+            "name": name,
+            "permissions": permissions,
+            "color": color,
+            "position": position
+        })
+    }).collect())
+}
+
+pub async fn handle_get_user_permissions_in_guild(
+    user_id: i32, 
+    guild_id: i32
+) -> Result<i64, String> {
+    let pool = get_db_pool();
+
+    // Исправлено: fetch_one возвращает i64, а не Option<i64>
+    let permissions: i64 = sqlx::query_scalar::<_, i64>(
+        "SELECT COALESCE(BIT_OR(r.permissions), 0) as total_permissions
+        FROM roles r
+        INNER JOIN member_roles mr ON r.id = mr.role_id
+        WHERE mr.user_id = $1 AND mr.guild_id = $2"
+    )
+    .bind(user_id)
+    .bind(guild_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| format!("Failed to get user permissions: {}", e))?;
+
+    Ok(permissions)
+}

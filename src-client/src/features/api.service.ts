@@ -97,6 +97,34 @@ class ApiService {
         }
     }
 
+    async getUserRolesInGuild(userId: number, guildId: number): Promise<any[]> {
+        try {
+            await wsService.waitForAuth();
+            const result = await wsService.request('get_user_roles_in_guild', { 
+                user_id: userId, 
+                guild_id: guildId 
+            });
+            return result.roles || [];
+        } catch (err) {
+            console.error('Get user roles error:', err);
+            return [];
+        }
+    }
+
+    async getUserPermissionsInGuild(userId: number, guildId: number): Promise<number> {
+        try {
+            await wsService.waitForAuth();
+            const result = await wsService.request('get_user_permissions_in_guild', { 
+                user_id: userId, 
+                guild_id: guildId 
+            });
+            return result.permissions || 0;
+        } catch (err) {
+            console.error('Get user permissions error:', err);
+            return 0;
+        }
+    }
+
     async createGuild(guildData: any): Promise<any> {
         try {
             await wsService.waitForAuth();

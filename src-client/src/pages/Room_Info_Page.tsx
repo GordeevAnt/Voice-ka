@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { apiService } from "../features/api.service";
 import { storeAPI } from "../features/useStore";
 import { wsService } from "../features/websocket.service";
+import { useUserPermissions } from "../features/useUserPermissions";
 import "./Info_Pages.css";
 
 interface Room {
@@ -35,6 +36,7 @@ export function Room_Info_Page() {
     const [users, setUsers] = useState<RoomUser[]>([]);
     const [loading, setLoading] = useState(true);
     const [roomId, setRoomId] = useState<number>(0);
+    const [guildId, setGuildId] = useState<number | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [editData, setEditData] = useState({
         name: "",
@@ -42,15 +44,22 @@ export function Room_Info_Page() {
         bitrate: 64000,
         user_limit: 0
     });
+    
+    // Получаем права пользователя
+    const { hasEditRooms, isLoading: permissionsLoading } = useUserPermissions(guildId);
 
     useEffect(() => {
         const loadInitialData = async () => {
             await wsService.waitForAuth();
             
             const storedRoomId = await storeAPI.get<number>('current_room_id');
+            const storedGuildId = await storeAPI.get<number>('current_guild_id');
             
             if (storedRoomId) {
                 setRoomId(storedRoomId);
+            }
+            if (storedGuildId) {
+                setGuildId(storedGuildId);
             }
         };
         
@@ -72,6 +81,10 @@ export function Room_Info_Page() {
             const roomData = await apiService.getRoomById(roomId);
             if (roomData) {
                 setRoom(roomData);
+                // Если guild_id не был установлен ранее, устанавливаем из данных комнаты
+                if (!guildId && roomData.guild_id) {
+                    setGuildId(roomData.guild_id);
+                }
                 setEditData({
                     name: roomData.name,
                     topic: roomData.topic || "",
@@ -86,6 +99,20 @@ export function Room_Info_Page() {
         }
     };
 
+    const handleSaveEdit = async () => {
+        if (!room || !editData.name.trim()) return;
+        
+        try {
+            // TODO: Добавить API метод для обновления комнаты
+            console.log("Saving room edit:", editData);
+            setIsEditing(false);
+            await loadRoomInfo();
+        } catch (err) {
+            console.error("Error saving room:", err);
+            alert("Ошибка сохранения");
+        }
+    };
+
     const getRoomIcon = (type: string) => {
         switch (type) {
             case 'text': return '💬';
@@ -95,7 +122,7 @@ export function Room_Info_Page() {
         }
     };
 
-    if (loading) {
+    if (loading || permissionsLoading) {
         return (
             <div className="room-info-page">
                 <div className="loading-container">Загрузка...</div>
@@ -119,6 +146,12 @@ export function Room_Info_Page() {
             <div className="room-info-header">
                 <button className="back-btn" onClick={() => navigate('/main')}>← Назад</button>
                 <h1>{getRoomIcon(room.room_type)} {room.name}</h1>
+                {/* Показываем кнопку редактирования только если есть право */}
+                {hasEditRooms && !isEditing && (
+                    <button className="edit-btn" onClick={() => setIsEditing(true)}>
+                        Редактировать
+                    </button>
+                )}
             </div>
 
             <div className="room-info-content">
@@ -243,8 +276,19 @@ export function Room_Info_Page() {
                         )}
                         
                         <div className="form-buttons">
-                            <button onClick={() => setIsEditing(false)} className="cancel-btn">
+                            <button onClick={() => {
+                                setIsEditing(false);
+                                setEditData({
+                                    name: room.name,
+                                    topic: room.topic || "",
+                                    bitrate: room.bitrate || 64000,
+                                    user_limit: room.user_limit || 0
+                                });
+                            }} className="cancel-btn">
                                 Отмена
+                            </button>
+                            <button onClick={handleSaveEdit} className="save-btn">
+                                Сохранить
                             </button>
                         </div>
                     </div>

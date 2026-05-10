@@ -5,6 +5,6 @@ pub mod message;
 pub mod room;
 
 pub use auth::*;
-// pub use guild::*;
+pub use guild::*;
 // pub use message::*;
 // pub use room::*;

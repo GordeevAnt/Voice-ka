@@ -5,6 +5,7 @@ import { apiService } from "../features/api.service";
 import { storeAPI } from "../features/useStore";
 import { wsService } from "../features/websocket.service";
 import { Switch_Room_Button } from "../shared/Switch_Room_Button";
+import { useUserPermissions } from "../features/useUserPermissions";
 
 interface RoomData {
     id: number;
@@ -30,6 +31,9 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [newRoomName, setNewRoomName] = useState("");
     const [newRoomTopic, setNewRoomTopic] = useState("");
+    
+    // Получаем права пользователя
+    const { hasCreateRooms, isLoading: permissionsLoading } = useUserPermissions(guildId);
 
     useEffect(() => {
         // Подписываемся на события комнат
@@ -70,11 +74,9 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
         setError(null);
         
         try {
-            // Ждем аутентификации перед загрузкой
             await wsService.waitForAuth();
             const guildRooms = await apiService.getGuildRooms(guildId);
             console.log('📋 Loaded rooms for guild', guildId, ':', guildRooms);
-            // Фильтруем только текстовые комнаты для отображения
             const textRooms = guildRooms.filter(r => r.type === 'text');
             setRooms(textRooms);
         } catch (err) {
@@ -88,7 +90,6 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
     useEffect(() => {
         loadRooms();
         
-        // Подписываемся на гильдию для получения обновлений
         wsService.subscribeGuild(guildId);
         
         return () => {
@@ -123,13 +124,11 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
             await wsService.waitForAuth();
             console.log('✅ Auth OK');
             
-            // Отправляем guild_id отдельно, а данные в data
             const result = await wsService.request('create_room', roomData, { guild_id: guildId });
             console.log('✅ Room created:', result);
             
             const newRoom = result.room;
             
-            // Добавляем новую комнату в список
             setRooms(prev => {
                 const exists = prev.some(r => r.id === newRoom.id);
                 if (exists) return prev;
@@ -170,9 +169,12 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
         <div className="rooms-list-block">
             <div className="rooms-header">
                 <h3>Текстовые комнаты</h3>
-                <button onClick={() => setShowCreateModal(true)} className="create-room-btn">
-                    Создать
-                </button>
+                {/* Показываем кнопку создания только если есть право */}
+                {hasCreateRooms && (
+                    <button onClick={() => setShowCreateModal(true)} className="create-room-btn">
+                        Создать
+                    </button>
+                )}
             </div>
             
             <div className="rooms-list">

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { apiService } from "../features/api.service";
 import { storeAPI } from "../features/useStore";
 import { wsService } from "../features/websocket.service";
+import { useUserPermissions } from "../features/useUserPermissions";
 import "./Info_Pages.css";
 
 interface Guild {
@@ -28,6 +29,14 @@ export function Chanel_Info_Page() {
     const [members, setMembers] = useState<GuildMember[]>([]);
     const [loading, setLoading] = useState(true);
     const [guildId, setGuildId] = useState<number>(0);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editData, setEditData] = useState({
+        name: "",
+        description: ""
+    });
+    
+    // Получаем права пользователя
+    const { hasEditGuild, isLoading: permissionsLoading } = useUserPermissions(guildId);
 
     useEffect(() => {
         const loadData = async () => {
@@ -59,6 +68,10 @@ export function Chanel_Info_Page() {
             const guildData = await apiService.findGuildById(guildId);
             if (guildData) {
                 setGuild(guildData);
+                setEditData({
+                    name: guildData.name,
+                    description: guildData.description || ""
+                });
             }
         } catch (err) {
             console.error("Ошибка загрузки информации о канале:", err);
@@ -78,11 +91,25 @@ export function Chanel_Info_Page() {
         }
     };
 
+    const handleSaveEdit = async () => {
+        if (!guild || !editData.name.trim()) return;
+        
+        try {
+            // TODO: Добавить API метод для обновления гильдии
+            console.log("Saving guild edit:", editData);
+            setIsEditing(false);
+            await loadGuildInfo();
+        } catch (err) {
+            console.error("Error saving guild:", err);
+            alert("Ошибка сохранения");
+        }
+    };
+
     const handleBack = () => {
         navigate('/main');
     };
 
-    if (loading) {
+    if (loading || permissionsLoading) {
         return (
             <div className="chanel-info-page">
                 <div className="loading-container">Загрузка...</div>
@@ -106,61 +133,110 @@ export function Chanel_Info_Page() {
             <div className="chanel-info-header">
                 <button className="back-btn" onClick={handleBack}>← Назад</button>
                 <h1>Информация о канале</h1>
+                {/* Показываем кнопку редактирования только если есть право */}
+                {hasEditGuild && !isEditing && (
+                    <button className="edit-btn" onClick={() => setIsEditing(true)}>
+                        Редактировать
+                    </button>
+                )}
             </div>
 
             <div className="chanel-info-content">
-                <div className="chanel-main-info">
-                    <div className="chanel-icon">
-                        {guild.icon ? (
-                            <img src={guild.icon} alt={guild.name} />
-                        ) : (
-                            <div className="default-icon">
-                                {guild.name[0]?.toUpperCase()}
+                {!isEditing ? (
+                    <>
+                        <div className="chanel-main-info">
+                            <div className="chanel-icon">
+                                {guild.icon ? (
+                                    <img src={guild.icon} alt={guild.name} />
+                                ) : (
+                                    <div className="default-icon">
+                                        {guild.name[0]?.toUpperCase()}
+                                    </div>
+                                )}
                             </div>
-                        )}
-                    </div>
-                    
-                    <div className="chanel-details">
-                        <h2>{guild.name}</h2>
-                        <p className="chanel-description">
-                            {guild.description || "Нет описания"}
-                        </p>
-                        <div className="chanel-stats">
-                            <span>👥 {members.length} участников</span>
-                            <span>👑 Владелец: {members.find(m => m.user_id === guild.owner_id)?.username || "Неизвестен"}</span>
+                            
+                            <div className="chanel-details">
+                                <h2>{guild.name}</h2>
+                                <p className="chanel-description">
+                                    {guild.description || "Нет описания"}
+                                </p>
+                                <div className="chanel-stats">
+                                    <span>👥 {members.length} участников</span>
+                                    <span>👑 Владелец: {members.find(m => m.user_id === guild.owner_id)?.username || "Неизвестен"}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="chanel-members-section">
+                            <h3>Участники ({members.length})</h3>
+                            <div className="members-list">
+                                {members.map((member) => (
+                                    <div key={member.user_id} className="member-item">
+                                        <div className="member-avatar">
+                                            {member.avatar ? (
+                                                <img src={member.avatar} alt={member.username} />
+                                            ) : (
+                                                <div className="avatar-placeholder">
+                                                    {member.username[0]?.toUpperCase()}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="member-info">
+                                            <span className="member-name">
+                                                {member.nickname || member.username}
+                                            </span>
+                                            {member.user_id === guild.owner_id && (
+                                                <span className="owner-badge">Владелец</span>
+                                            )}
+                                        </div>
+                                        <div className="member-joined">
+                                            Присоединился: {new Date(member.joined_at).toLocaleDateString()}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <div className="edit-guild-form">
+                        <h3>Редактирование канала</h3>
+                        
+                        <div className="form-group">
+                            <label>Название канала:</label>
+                            <input
+                                type="text"
+                                value={editData.name}
+                                onChange={(e) => setEditData({...editData, name: e.target.value})}
+                                maxLength={100}
+                            />
+                        </div>
+                        
+                        <div className="form-group">
+                            <label>Описание:</label>
+                            <textarea
+                                value={editData.description}
+                                onChange={(e) => setEditData({...editData, description: e.target.value})}
+                                rows={4}
+                                maxLength={500}
+                            />
+                        </div>
+                        
+                        <div className="form-buttons">
+                            <button onClick={() => {
+                                setIsEditing(false);
+                                setEditData({
+                                    name: guild.name,
+                                    description: guild.description || ""
+                                });
+                            }} className="cancel-btn">
+                                Отмена
+                            </button>
+                            <button onClick={handleSaveEdit} className="save-btn">
+                                Сохранить
+                            </button>
                         </div>
                     </div>
-                </div>
-
-                <div className="chanel-members-section">
-                    <h3>Участники ({members.length})</h3>
-                    <div className="members-list">
-                        {members.map((member) => (
-                            <div key={member.user_id} className="member-item">
-                                <div className="member-avatar">
-                                    {member.avatar ? (
-                                        <img src={member.avatar} alt={member.username} />
-                                    ) : (
-                                        <div className="avatar-placeholder">
-                                            {member.username[0]?.toUpperCase()}
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="member-info">
-                                    <span className="member-name">
-                                        {member.nickname || member.username}
-                                    </span>
-                                    {member.user_id === guild.owner_id && (
-                                        <span className="owner-badge">Владелец</span>
-                                    )}
-                                </div>
-                                <div className="member-joined">
-                                    Присоединился: {new Date(member.joined_at).toLocaleDateString()}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+                )}
             </div>
         </div>
     );

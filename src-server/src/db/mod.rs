@@ -222,27 +222,50 @@ async fn seed_database(pool: &PgPool) -> Result<(), Box<dyn std::error::Error>> 
         r#"
         INSERT INTO roles (id, guild_id, name, color, position, permissions, hoist, is_mentionable, created_at, updated_at)
         VALUES 
-            (1, 1, 'Admin', '#FF0000', 100, 2147483647, true, true, '2024-01-20 12:00:00+00', '2024-01-20 12:00:00+00'),
-            (2, 1, 'Moderator', '#00FF00', 50, 268435456, true, true, '2024-01-20 12:00:00+00', '2024-01-20 12:00:00+00'),
+            (1, 1, 'Admin', '#FF0000', 100, 0, true, true, '2024-01-20 12:00:00+00', '2024-01-20 12:00:00+00'),
+            (2, 1, 'Moderator', '#00FF00', 50, 0, true, true, '2024-01-20 12:00:00+00', '2024-01-20 12:00:00+00'),
             (3, 2, 'VIP', '#FFD700', 30, 0, true, true, '2024-02-25 18:30:00+00', '2024-02-25 18:30:00+00'),
             (4, 2, '@everyone', '#99AAB5', 0, 0, false, false, '2024-02-25 18:30:00+00', '2024-02-25 18:30:00+00')
-        "#
+        "#,
     )
     .execute(pool)
     .await?;
 
-    // 5. Назначение ролей
+    // Обновляем права ролей
+    println!("  → Настройка прав ролей...");
+
+    // Admin: все права (полный доступ)
+    sqlx::query("UPDATE roles SET permissions = 2147483647 WHERE id = 1")
+        .execute(pool)
+        .await?;
+
+    // Moderator: EDIT_GUILD(2) | CREATE_ROOMS(4) | EDIT_ROOMS(8) | SEND_MESSAGES(16) = 30
+    sqlx::query("UPDATE roles SET permissions = 30 WHERE id = 2")
+        .execute(pool)
+        .await?;
+
+    // VIP: только SEND_MESSAGES(16)
+    sqlx::query("UPDATE roles SET permissions = 16 WHERE id = 3")
+        .execute(pool)
+        .await?;
+
+    // @everyone: нет прав
+    sqlx::query("UPDATE roles SET permissions = 0 WHERE id = 4")
+        .execute(pool)
+        .await?;
+
+    // 5. Назначение ролей пользователям
     println!("  → Назначение ролей пользователям...");
     sqlx::query(
         r#"
         INSERT INTO member_roles (id, user_id, role_id, guild_id)
         VALUES 
-            (1, 4, 1, 1),
-            (2, 1, 2, 1),
-            (3, 3, 2, 1),
-            (4, 2, 3, 2),
-            (5, 5, 4, 2)
-        "#
+            (1, 4, 1, 1),     -- admin_serg: Admin (все права)
+            (2, 1, 2, 1),     -- alex_kot: Moderator (30)
+            (3, 3, 2, 1),     -- lena_voise: Moderator (30)
+            (4, 2, 3, 2),     -- dj_max: VIP (только отправка сообщений)
+            (5, 5, 4, 2)      -- guest_oleg: @everyone (нет прав)
+        "#,
     )
     .execute(pool)
     .await?;
