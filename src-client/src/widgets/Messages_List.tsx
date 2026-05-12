@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, memo, useRef } from "react";
 import "./Messages_List.css";
 import { apiService } from "../features/api.service";
 import { Message } from "../entities/Message";
+import { wsService } from "../features/websocket.service";
 
 interface MessageType {
     id: number;
@@ -51,6 +52,19 @@ export const Messages_List = memo(({ roomId, currentUserId, wsMessage }: Message
     useEffect(() => {
         setMessages([]);
         loadMessages();
+        
+        // Подписываемся на обновления профилей для обновления имён авторов
+        const unsubscribeProfileUpdated = wsService.on('user_profile_updated', (userData) => {
+            setMessages(prev => prev.map(msg =>
+                msg.user_id === userData.user_id
+                    ? { ...msg, author_name: userData.username }
+                    : msg
+            ));
+        });
+        
+        return () => {
+            unsubscribeProfileUpdated();
+        };
     }, [loadMessages]);
 
     useEffect(() => {

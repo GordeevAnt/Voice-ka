@@ -77,7 +77,6 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
     useEffect(() => {
         fetchGuilds();
         
-        // Подписываемся на события создания/обновления гильдий
         const unsubscribeGuildCreated = wsService.on('guild_created', (guild) => {
             console.log('🆕 New guild created via WS:', guild);
             setGuilds(prev => {
@@ -87,8 +86,26 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
             });
         });
         
+        const unsubscribeGuildUpdated = wsService.on('guild_updated', (updatedGuild) => {
+            console.log('🔄 Guild updated via WS:', updatedGuild);
+            setGuilds(prev => prev.map(g => 
+                g.id === updatedGuild.id ? updatedGuild : g
+            ));
+        });
+        
+        // Подписка на обновление профиля для владельца канала
+        const unsubscribeProfileUpdated = wsService.on('user_profile_updated', (userData) => {
+            setGuilds(prev => prev.map(g =>
+                g.owner_id === userData.user_id
+                    ? { ...g, owner_name: userData.username }
+                    : g
+            ));
+        });
+        
         return () => {
             unsubscribeGuildCreated();
+            unsubscribeGuildUpdated();
+            unsubscribeProfileUpdated();
         };
     }, []);
 

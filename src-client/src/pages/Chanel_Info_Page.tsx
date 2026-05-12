@@ -1,6 +1,6 @@
 // pages/Chanel_Info_Page.tsx
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState, useRef } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { apiService } from "../features/api.service";
 import { storeAPI } from "../features/useStore";
 import { wsService } from "../features/websocket.service";
@@ -25,6 +25,7 @@ interface GuildMember {
 
 export function Chanel_Info_Page() {
     const navigate = useNavigate();
+    const location = useLocation();
     const [guild, setGuild] = useState<Guild | null>(null);
     const [members, setMembers] = useState<GuildMember[]>([]);
     const [loading, setLoading] = useState(true);
@@ -35,8 +36,82 @@ export function Chanel_Info_Page() {
         description: ""
     });
     
-    // Получаем права пользователя
     const { hasEditGuild, isLoading: permissionsLoading } = useUserPermissions(guildId);
+    const guildIdRef = useRef(guildId);
+
+    useEffect(() => {
+        guildIdRef.current = guildId;
+    }, [guildId]);
+
+    useEffect(() => {
+        const unsubscribeGuildUpdated = wsService.on('guild_updated', (updatedGuild) => {
+            console.log('🔄 Guild updated via WS:', updatedGuild);
+            if (updatedGuild.id === guildIdRef.current) {
+                setGuild(updatedGuild);
+                setEditData({
+                    name: updatedGuild.name,
+                    description: updatedGuild.description || ""
+                });
+            }
+        });
+        
+        const unsubscribeUserProfileUpdated = wsService.on('user_profile_updated', (userData) => {
+            console.log('👤 User profile updated via WS:', userData);
+            setMembers(prev => prev.map(member => 
+                member.user_id === userData.user_id 
+                    ? { ...member, username: userData.username, avatar: userData.avatar }
+                    : member
+            ));
+        });
+        
+        return () => {
+            unsubscribeGuildUpdated();
+            unsubscribeUserProfileUpdated();
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!guildId) return;
+        
+        const unsubscribeGuildUpdated = wsService.on('guild_updated', (updatedGuild) => {
+            console.log('🔄 Guild updated via WS:', updatedGuild);
+            if (updatedGuild.id === guildId) {
+                setGuild(updatedGuild);
+                setEditData({
+                    name: updatedGuild.name,
+                    description: updatedGuild.description || ""
+                });
+            }
+        });
+        
+        const unsubscribeUserProfileUpdated = wsService.on('user_profile_updated', (userData) => {
+            console.log('👤 User profile updated via WS:', userData);
+            setMembers(prev => prev.map(member => 
+                member.user_id === userData.user_id 
+                    ? { ...member, username: userData.username, avatar: userData.avatar }
+                    : member
+            ));
+        });
+        
+        return () => {
+            unsubscribeGuildUpdated();
+            unsubscribeUserProfileUpdated();
+        };
+    }, [guildId]);
+
+    useEffect(() => {
+        if (guildId) {
+            console.log('📡 Chanel_Info_Page subscribing to guild:', guildId);
+            wsService.subscribeGuild(guildId);
+        }
+        
+        return () => {
+            if (guildId) {
+                console.log('📡 Chanel_Info_Page unsubscribing from guild:', guildId);
+                wsService.unsubscribeGuild(guildId);
+            }
+        };
+    }, [guildId]);
 
     useEffect(() => {
         const loadData = async () => {
@@ -59,7 +134,7 @@ export function Chanel_Info_Page() {
             loadGuildInfo();
             loadGuildMembers();
         }
-    }, [guildId]);
+    }, [guildId, location.key]);
 
     const loadGuildInfo = async () => {
         if (!guildId) return;
@@ -97,7 +172,7 @@ export function Chanel_Info_Page() {
         try {
             const updatedGuild = await apiService.updateGuild(guild.id, {
                 name: editData.name,
-                description: editData.description || null  // используем null вместо undefined
+                description: editData.description || null
             });
             
             if (updatedGuild) {
@@ -140,13 +215,10 @@ export function Chanel_Info_Page() {
             <div className="chanel-info-header">
                 <button className="back-btn" onClick={handleBack}>← Назад</button>
                 <h1>Информация о канале</h1>
-                {/* Показываем кнопку редактирования только если есть право */}
                 {hasEditGuild && !isEditing && (
-                    <>
-                        <button className="edit-btn" onClick={() => setIsEditing(true)}>
-                            Редактировать
-                        </button>
-                    </>
+                    <button className="edit-btn" onClick={() => setIsEditing(true)}>
+                        Редактировать
+                    </button>
                 )}
             </div>
 

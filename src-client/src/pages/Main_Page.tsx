@@ -64,6 +64,18 @@ export function Main_Page() {
         };
     }, [navigate]);
 
+    useEffect(() => {
+        if (currentGuildId) {
+            console.log('📡 Main_Page subscribing to guild:', currentGuildId);
+            wsService.subscribeGuild(currentGuildId);
+            
+            return () => {
+                console.log('📡 Main_Page unsubscribing from guild:', currentGuildId);
+                wsService.unsubscribeGuild(currentGuildId);
+            };
+        }
+    }, [currentGuildId]);
+
     const handleGuildSelect = useCallback(async (guildId: number) => {
         console.log(`🔄 Switching to guild: ${guildId}`);
         setCurrentGuildId(guildId);

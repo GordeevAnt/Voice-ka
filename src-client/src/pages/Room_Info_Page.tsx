@@ -1,6 +1,6 @@
 // pages/Room_Info_Page.tsx
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { apiService } from "../features/api.service";
 import { storeAPI } from "../features/useStore";
 import { wsService } from "../features/websocket.service";
@@ -10,7 +10,7 @@ import "./Info_Pages.css";
 interface Room {
     id: number;
     name: string;
-    room_type: string;
+    type: string;
     guild_id: number | null;
     topic: string | null;
     position: number | null;
@@ -32,6 +32,7 @@ interface RoomUser {
 
 export function Room_Info_Page() {
     const navigate = useNavigate();
+    const location = useLocation();
     const [room, setRoom] = useState<Room | null>(null);
     const [users, setUsers] = useState<RoomUser[]>([]);
     const [loading, setLoading] = useState(true);
@@ -41,13 +42,79 @@ export function Room_Info_Page() {
     const [editData, setEditData] = useState({
         name: "",
         topic: "",
+        room_type: "text",
         bitrate: 64000,
         user_limit: 0
     });
     
-    // Получаем права пользователя
     const { hasEditRooms, isLoading: permissionsLoading } = useUserPermissions(guildId);
+    const roomIdRef = useRef(roomId);
+    const guildIdRef = useRef(guildId);
+    
+    useEffect(() => {
+        if (!roomId) return;
+        
+        const unsubscribeRoomUpdated = wsService.on('room_updated', (updatedRoom) => {
+            console.log('🔄 Room updated via WS:', updatedRoom);
+            if (updatedRoom.id === roomId) {
+                // Убедимся, что используем правильное поле для типа комнаты
+                const roomType = updatedRoom.type || updatedRoom.room_type;
+                setRoom({
+                    ...updatedRoom,
+                    room_type: roomType
+                });
+                // Обновляем форму редактирования
+                setEditData({
+                    name: updatedRoom.name,
+                    topic: updatedRoom.topic || "",
+                    room_type: roomType || "text",
+                    bitrate: updatedRoom.bitrate || 64000,
+                    user_limit: updatedRoom.user_limit || 0
+                });
+            }
+        });
+        
+        return () => {
+            unsubscribeRoomUpdated();
+        };
+    }, [roomId]);
 
+    useEffect(() => {
+        roomIdRef.current = roomId;
+    }, [roomId]);
+
+    useEffect(() => {
+        guildIdRef.current = guildId;
+    }, [guildId]);
+
+    useEffect(() => {
+        const unsubscribeRoomUpdated = wsService.on('room_updated', (updatedRoom) => {
+            console.log('🔄 Room updated via WS:', updatedRoom);
+            console.log('Current roomId:', roomIdRef.current);
+            console.log('Updated room id:', updatedRoom.id);
+            
+            if (updatedRoom.id === roomIdRef.current) {
+                const roomType = updatedRoom.type || updatedRoom.room_type;
+                setRoom(prev => prev ? {
+                    ...prev,
+                    ...updatedRoom,
+                    room_type: roomType
+                } : updatedRoom);
+                setEditData({
+                    name: updatedRoom.name,
+                    topic: updatedRoom.topic || "",
+                    room_type: roomType || "text",
+                    bitrate: updatedRoom.bitrate || 64000,
+                    user_limit: updatedRoom.user_limit || 0
+                });
+            }
+        });
+        
+        return () => {
+            unsubscribeRoomUpdated();
+        };
+    }, []);
+    
     useEffect(() => {
         const loadInitialData = async () => {
             await wsService.waitForAuth();
@@ -64,7 +131,22 @@ export function Room_Info_Page() {
         };
         
         loadInitialData();
+        
     }, []);
+    
+    useEffect(() => {
+        if (guildId) {
+            console.log('📡 Room_Info_Page subscribing to guild:', guildId);
+            wsService.subscribeGuild(guildId);
+        }
+        
+        return () => {
+            if (guildId) {
+                console.log('📡 Room_Info_Page unsubscribing from guild:', guildId);
+                wsService.unsubscribeGuild(guildId);
+            }
+        };
+    }, [guildId]);
 
     useEffect(() => {
         if (roomId) {
@@ -72,7 +154,7 @@ export function Room_Info_Page() {
         } else {
             setLoading(false);
         }
-    }, [roomId]);
+    }, [roomId, location.key]);
     
     const loadRoomInfo = async () => {
         if (!roomId) return;
@@ -80,14 +162,25 @@ export function Room_Info_Page() {
         try {
             const roomData = await apiService.getRoomById(roomId);
             if (roomData) {
-                setRoom(roomData);
-                // Если guild_id не был установлен ранее, устанавливаем из данных комнаты
+                // Используем поле "type" из ответа
+                const roomType = roomData.type || roomData.room_type || "text";
+                
+                const roomWithType = {
+                    ...roomData,
+                    room_type: roomType
+                };
+                
+                setRoom(roomWithType);
+                
                 if (!guildId && roomData.guild_id) {
+                    console.log('📡 Setting guildId from room data:', roomData.guild_id);
                     setGuildId(roomData.guild_id);
                 }
+                
                 setEditData({
                     name: roomData.name,
                     topic: roomData.topic || "",
+                    room_type: roomType,
                     bitrate: roomData.bitrate || 64000,
                     user_limit: roomData.user_limit || 0
                 });
@@ -105,9 +198,10 @@ export function Room_Info_Page() {
         try {
             const updatedRoom = await apiService.updateRoom(room.id, {
                 name: editData.name,
-                topic: editData.topic || null,  // используем null вместо undefined
-                bitrate: room.room_type === 'voice' ? editData.bitrate : undefined,
-                user_limit: room.room_type === 'voice' ? editData.user_limit : 0
+                topic: editData.topic || null,
+                type: editData.room_type,
+                bitrate: room.type === 'voice' ? editData.bitrate : undefined,
+                user_limit: room.type === 'voice' ? editData.user_limit : 0
             });
             
             if (updatedRoom) {
@@ -127,7 +221,7 @@ export function Room_Info_Page() {
             case 'text': return '💬';
             case 'voice': return '🎙️';
             case 'video': return '📹';
-            default: return '📁';
+            default: return '💬';
         }
     };
 
@@ -154,8 +248,7 @@ export function Room_Info_Page() {
         <div className="room-info-page">
             <div className="room-info-header">
                 <button className="back-btn" onClick={() => navigate('/main')}>← Назад</button>
-                <h1>{getRoomIcon(room.room_type)} {room.name}</h1>
-                {/* Показываем кнопку редактирования только если есть право */}
+                <h1>{getRoomIcon(room.type)} {room.name}</h1>
                 {hasEditRooms && !isEditing && (
                     <button className="edit-btn" onClick={() => setIsEditing(true)}>
                         Редактировать
@@ -169,7 +262,7 @@ export function Room_Info_Page() {
                         <div className="room-details">
                             <div className="detail-item">
                                 <label>Тип комнаты:</label>
-                                <span className="room-type-badge">{room.room_type}</span>
+                                <span className="room-type-badge">{room.type}</span>
                             </div>
                             
                             <div className="detail-item">
@@ -182,7 +275,7 @@ export function Room_Info_Page() {
                                 <p>{new Date(room.created_at).toLocaleString()}</p>
                             </div>
                             
-                            {room.room_type === 'voice' && (
+                            {room.type === 'voice' && (
                                 <>
                                     <div className="detail-item">
                                         <label>Битрейт:</label>
@@ -201,25 +294,27 @@ export function Room_Info_Page() {
                                 <h3>Пользователи в комнате ({users.length})</h3>
                                 <div className="users-list">
                                     {users.map((user) => (
-                                        <div key={user.user_id} className="user-item">
-                                            <div className="user-avatar">
-                                                {user.avatar ? (
-                                                    <img src={user.avatar} alt={user.username} />
-                                                ) : (
-                                                    <div className="avatar-placeholder">
-                                                        {user.username[0]?.toUpperCase()}
+                                        <>
+                                            <div key={user.user_id} className="user-item">
+                                                <div className="user-avatar">
+                                                    {user.avatar ? (
+                                                        <img src={user.avatar} alt={user.username} />
+                                                    ) : (
+                                                        <div className="avatar-placeholder">
+                                                            {user.username[0]?.toUpperCase()}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="user-info">
+                                                    <span className="user-name">{user.username}</span>
+                                                    <div className="user-status">
+                                                        {user.is_muted && <span className="badge muted">🔇 Заглушен</span>}
+                                                        {user.is_deafened && <span className="badge deafened">🔇 Глухой</span>}
+                                                        {user.is_streaming && <span className="badge streaming">📺 Стримит</span>}
                                                     </div>
-                                                )}
-                                            </div>
-                                            <div className="user-info">
-                                                <span className="user-name">{user.username}</span>
-                                                <div className="user-status">
-                                                    {user.is_muted && <span className="badge muted">🔇 Заглушен</span>}
-                                                    {user.is_deafened && <span className="badge deafened">🔇 Глухой</span>}
-                                                    {user.is_streaming && <span className="badge streaming">📺 Стримит</span>}
                                                 </div>
                                             </div>
-                                        </div>
+                                        </>
                                     ))}
                                 </div>
                             </div>
@@ -240,6 +335,19 @@ export function Room_Info_Page() {
                         </div>
                         
                         <div className="form-group">
+                            <label>Тип комнаты:</label>
+                            <select
+                                value={editData.room_type}
+                                onChange={(e) => setEditData({...editData, room_type: e.target.value})}
+                            >
+                                <option value="text">Текстовая</option>
+                                <option value="voice" disabled>Голосовая (скоро)</option>
+                                <option value="video" disabled>Видео (скоро)</option>
+                            </select>
+                            <small>Пока доступны только текстовые комнаты</small>
+                        </div>
+                        
+                        <div className="form-group">
                             <label>Тема:</label>
                             <textarea
                                 value={editData.topic}
@@ -249,7 +357,7 @@ export function Room_Info_Page() {
                             />
                         </div>
                         
-                        {room.room_type === 'voice' && (
+                        {room.type === 'voice' && (
                             <>
                                 <div className="form-group">
                                     <label>Битрейт (kbps):</label>
@@ -285,6 +393,7 @@ export function Room_Info_Page() {
                                 setEditData({
                                     name: room.name,
                                     topic: room.topic || "",
+                                    room_type: room.type,
                                     bitrate: room.bitrate || 64000,
                                     user_limit: room.user_limit || 0
                                 });

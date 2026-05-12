@@ -83,8 +83,6 @@ pub async fn get_user_guilds_ids(user_id: i32) -> Result<Vec<i32>, String> {
     Ok(guilds)
 }
 
-
-
 pub async fn handle_create_guild(
     user_id: i32,
     data: CreateGuildData,

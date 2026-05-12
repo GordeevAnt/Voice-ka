@@ -130,10 +130,10 @@ pub async fn handle_get_guild_rooms(guild_id: i32) -> Result<Vec<serde_json::Val
         let created_at: chrono::DateTime<chrono::Utc> = room_row.get(7);
         let updated_at: chrono::DateTime<chrono::Utc> = room_row.get(8);
 
-        let room_data = json!({
+        let result = json!({
             "id": id,
             "name": name,
-            "type": room_type,
+            "type": room_type,  // Используем "type", а не "room_type"
             "guild_id": guild_id,
             "topic": topic,
             "position": position,
@@ -144,17 +144,17 @@ pub async fn handle_get_guild_rooms(guild_id: i32) -> Result<Vec<serde_json::Val
             "member_count": 0
         });
 
-        println!("✅ [SERVER] Room created: {:?}", room_data);
+        println!("✅ [SERVER] Room created: {:?}", result);
         println!("📡 [SERVER] Broadcasting to guild {}", guild_id);
 
-        let ws_msg = WsMessage::new("room_created", room_data.clone())
+        let ws_msg = WsMessage::new("room_created", result.clone())
             .with_guild(guild_id);
 
         manager.broadcast_to_guild(guild_id, ws_msg).await;
         
         println!("✅ [SERVER] Broadcast sent");
 
-        Ok(room_data)
+        Ok(result)
     }
 
 pub async fn handle_get_room_by_id(room_id: i32) -> Result<serde_json::Value, String> {
@@ -200,7 +200,7 @@ pub async fn handle_get_room_by_id(room_id: i32) -> Result<serde_json::Value, St
             Ok(json!({
                 "id": id,
                 "name": name,
-                "room_type": room_type,
+                "type": room_type,
                 "guild_id": guild_id,
                 "topic": topic,
                 "position": position,
@@ -216,9 +216,11 @@ pub async fn handle_get_room_by_id(room_id: i32) -> Result<serde_json::Value, St
 }
 
 #[derive(Debug, serde::Deserialize)]
+#[allow(dead_code)]
 pub struct UpdateRoomData {
     pub name: String,
     pub topic: Option<String>,
+    pub room_type: Option<String>,  // добавлено поле типа комнаты
     pub bitrate: Option<i32>,
     pub user_limit: Option<i32>,
 }
@@ -231,7 +233,6 @@ pub async fn handle_update_room(
 ) -> Result<serde_json::Value, String> {
     let pool = get_db_pool();
 
-    // Получаем guild_id комнаты
     let guild_id: Option<i32> = sqlx::query_scalar(
         "SELECT guild_id FROM rooms WHERE id = $1"
     )
@@ -245,9 +246,8 @@ pub async fn handle_update_room(
         None => return Err("Room not found".to_string()),
     };
 
-    // Проверяем права пользователя
     let permissions = crate::handlers::guild::handle_get_user_permissions_in_guild(user_id, guild_id).await?;
-    let has_edit_rooms = (permissions & 8) != 0; // EDIT_ROOMS = 8
+    let has_edit_rooms = (permissions & 8) != 0;
 
     if !has_edit_rooms {
         return Err("You don't have permission to edit this room".to_string());
@@ -255,16 +255,15 @@ pub async fn handle_update_room(
 
     let now = Utc::now();
 
+    // Простой UPDATE без динамического формирования (исправляем ошибку дублирования)
     let room_row = sqlx::query(
         "UPDATE rooms 
-         SET name = $1, topic = $2, bitrate = $3, user_limit = $4, updated_at = $5
-         WHERE id = $6
+         SET name = $1, topic = $2, updated_at = $3
+         WHERE id = $4
          RETURNING id, name, type, topic, position, bitrate, user_limit, created_at, updated_at"
     )
     .bind(&data.name)
     .bind(&data.topic)
-    .bind(data.bitrate)
-    .bind(data.user_limit)
     .bind(now)
     .bind(room_id)
     .fetch_optional(pool)
@@ -297,7 +296,6 @@ pub async fn handle_update_room(
                 "member_count": 0
             });
 
-            // Уведомляем всех в гильдии об обновлении комнаты
             let ws_msg = WsMessage::new("room_updated", result.clone())
                 .with_guild(guild_id);
             manager.broadcast_to_guild(guild_id, ws_msg).await;

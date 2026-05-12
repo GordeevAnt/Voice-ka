@@ -38,7 +38,6 @@ export function Rooms_Online_List({ guildId }: RoomsOnlineListProps) {
         });
     }, []);
 
-    // Подписка на события через WebSocket
     useEffect(() => {
         const unsubscribeStatus = wsService.on('user_status_changed', handleUserStatusChanged);
         const unsubscribeOnline = wsService.on('user_online', (user) => {
@@ -58,13 +57,23 @@ export function Rooms_Online_List({ guildId }: RoomsOnlineListProps) {
                 });
             }
         });
+        
+        // Добавим обработку обновления профиля
+        const unsubscribeProfileUpdated = wsService.on('user_profile_updated', (userData) => {
+            console.log('👤 Profile updated in online list:', userData);
+            setOnlineUsers(prev => prev.map(user =>
+                user.user_id === userData.user_id
+                    ? { ...user, username: userData.username, avatar: userData.avatar }
+                    : user
+            ));
+        });
 
-        // В return добавьте:
         return () => {
             unsubscribeStatus();
             unsubscribeOnline();
             unsubscribeOffline();
             unsubscribeUserJoined();
+            unsubscribeProfileUpdated();  // добавить
         };
     }, [handleUserStatusChanged]);
 

@@ -216,7 +216,7 @@ class ApiService {
         }
     }
 
-    async updateRoom(roomId: number, data: { name: string; topic?: string | null; bitrate?: number; user_limit?: number }): Promise<any> {
+    async updateRoom(roomId: number, data: { name: string; topic?: string | null; type?: string; bitrate?: number; user_limit?: number }): Promise<any> {
         try {
             await wsService.waitForAuth();
             const result = await wsService.request('update_room', data, { room_id: roomId });
