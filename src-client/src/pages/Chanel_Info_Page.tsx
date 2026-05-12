@@ -64,9 +64,26 @@ export function Chanel_Info_Page() {
             ));
         });
         
+        const unsubscribeUserJoinedGuild = wsService.on('user_joined_guild', (userData) => {
+            console.log('👋 User joined guild via WS:', userData);
+            // Добавляем нового участника в список, если его там ещё нет
+            setMembers(prev => {
+                const exists = prev.some(m => m.user_id === userData.user_id);
+                if (exists) return prev;
+                return [...prev, {
+                    user_id: userData.user_id,
+                    username: userData.username,
+                    avatar: userData.avatar,
+                    nickname: null,
+                    joined_at: new Date().toISOString()
+                }];
+            });
+        });
+        
         return () => {
             unsubscribeGuildUpdated();
             unsubscribeUserProfileUpdated();
+            unsubscribeUserJoinedGuild();
         };
     }, []);
 
