@@ -147,4 +147,19 @@ impl SubscriptionManager {
             }
         }
     }
+
+    pub async fn send_to_user_by_user_id(&self, user_id: i32, message: WsMessage) {
+        let connections = self.connections.lock().await;
+        let connection_info = self.connection_info.lock().await;
+        
+        // Находим соединение по user_id
+        for (conn_id, info) in connection_info.iter() {
+            if info.user_id == user_id {
+                if let Some(sender) = connections.get(conn_id) {
+                    let _ = sender.send(message.clone());
+                }
+                break;
+            }
+        }
+    }
 }

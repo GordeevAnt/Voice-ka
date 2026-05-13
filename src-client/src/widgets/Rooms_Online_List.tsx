@@ -58,7 +58,18 @@ export function Rooms_Online_List({ guildId }: RoomsOnlineListProps) {
             }
         });
         
-        // Добавим обработку обновления профиля
+        // 👇 НОВЫЙ ОБРАБОТЧИК - пользователь покинул гильдию
+        const unsubscribeUserLeftGuild = wsService.on('user_left_guild', (data) => {
+            console.log('👋 User left guild in online list:', data);
+            const { user_id, guild_id: leftGuildId } = data;
+            
+            // Если это событие для текущей гильдии
+            if (leftGuildId === guildId) {
+                // Удаляем пользователя из списка онлайн
+                setOnlineUsers(prev => prev.filter(user => user.user_id !== user_id));
+            }
+        });
+        
         const unsubscribeProfileUpdated = wsService.on('user_profile_updated', (userData) => {
             console.log('👤 Profile updated in online list:', userData);
             setOnlineUsers(prev => prev.map(user =>
@@ -73,9 +84,10 @@ export function Rooms_Online_List({ guildId }: RoomsOnlineListProps) {
             unsubscribeOnline();
             unsubscribeOffline();
             unsubscribeUserJoined();
-            unsubscribeProfileUpdated();  // добавить
+            unsubscribeUserLeftGuild();  // 👈 НОВАЯ ОТПИСКА
+            unsubscribeProfileUpdated();
         };
-    }, [handleUserStatusChanged]);
+    }, [handleUserStatusChanged, guildId]);
 
     // Загрузка начальных данных через WebSocket
     useEffect(() => {

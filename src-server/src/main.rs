@@ -470,6 +470,45 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                             }
                                         }
 
+                                        "leave_guild" => {
+                                            if let (Some(uid), Some(guild_id), Some(data)) = (current_user_id, client_msg.guild_id, client_msg.data) {
+                                                if uid > 0 {
+                                                    // Можно также проверить guild_id из data, если не передан в guild_id
+                                                    let actual_guild_id = data.get("guild_id")
+                                                        .and_then(|v| v.as_i64())
+                                                        .unwrap_or(guild_id as i64) as i32;
+                                                    
+                                                    match handlers::guild::handle_leave_guild(uid, actual_guild_id, manager.clone()).await {
+                                                        Ok(success) => {
+                                                            let resp = WsMessage::success_response(request_id, json!({ 
+                                                                "success": success,
+                                                                "guild_id": actual_guild_id
+                                                            }));
+                                                            let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                serde_json::to_string(&resp).unwrap()
+                                                            ));
+                                                        }
+                                                        Err(e) => {
+                                                            let resp = WsMessage::error_response(request_id, &e);
+                                                            let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                serde_json::to_string(&resp).unwrap()
+                                                            ));
+                                                        }
+                                                    }
+                                                } else {
+                                                    let resp = WsMessage::error_response(request_id, "Not authenticated");
+                                                    let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                        serde_json::to_string(&resp).unwrap()
+                                                    ));
+                                                }
+                                            } else {
+                                                let resp = WsMessage::error_response(request_id, "Missing user_id or guild_id");
+                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                    serde_json::to_string(&resp).unwrap()
+                                                ));
+                                            }
+                                        }
+
                                         "get_guild_members" => {
                                             if let Some(guild_id) = client_msg.guild_id {
                                                 match handlers::guild::handle_get_guild_members(guild_id).await {

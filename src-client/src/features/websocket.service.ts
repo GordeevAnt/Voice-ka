@@ -172,6 +172,10 @@ class WebSocketService {
         }
     }
 
+    getCurrentUserId(): number | null {
+        return this.userId;
+    }
+
     private async handleMessage(message: any) {
         // Обработка ответов на запросы
         if (message.request_id && this.pendingRequests.has(message.request_id)) {

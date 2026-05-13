@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { apiService } from "../features/api.service";
 import { storeAPI } from "../features/useStore";
+import { wsService } from "../features/websocket.service";
 import "./Search_Chanel.css";
 
 interface GuildInfo {
@@ -72,7 +73,16 @@ export function Search_Chanel({ onGuildJoined }: SearchChanelProps) {
             const success = await apiService.joinGuild(userId, foundGuild.id);
             
             if (success) {
-                onGuildJoined?.();
+                // Подписываемся на гильдию для получения обновлений
+                wsService.subscribeGuild(foundGuild.id);
+                
+                // Небольшая задержка перед вызовом обновления
+                setTimeout(() => {
+                    // Уведомляем родительский компонент об успешном присоединении
+                    onGuildJoined?.();
+                }, 500);
+                
+                // Очищаем модальное окно
                 handleCloseModal();
             } else {
                 setError("Не удалось присоединиться к каналу");

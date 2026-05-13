@@ -265,7 +265,8 @@ pub async fn handle_join_guild(
         "user_id": user_id,
         "username": username,
         "avatar": avatar,
-        "status": status
+        "status": status,
+        "guild_id": guild_id,
     });
 
     let ws_joined_msg = WsMessage::new("user_joined_guild", user_joined_data)
@@ -283,6 +284,150 @@ pub async fn handle_join_guild(
             &[guild_id],
         ).await;
     }
+
+    Ok(true)
+}
+
+pub async fn handle_leave_guild(
+    user_id: i32,
+    guild_id: i32,
+    manager: Arc<SubscriptionManager>,
+) -> Result<bool, String> {
+    let pool = get_db_pool();
+
+    // Проверяем, существует ли гильдия
+    let guild_exists: Option<bool> = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM guilds WHERE id = $1)"
+    )
+    .bind(guild_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let guild_exists = guild_exists.unwrap_or(false);
+    if !guild_exists {
+        return Err("Guild not found".to_string());
+    }
+
+    // Проверяем, состоит ли пользователь в гильдии
+    let is_member: Option<bool> = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM guild_members WHERE user_id = $1 AND guild_id = $2)"
+    )
+    .bind(user_id)
+    .bind(guild_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let is_member = is_member.unwrap_or(false);
+    if !is_member {
+        return Err("You are not a member of this guild".to_string());
+    }
+
+    // Проверяем, является ли пользователь владельцем
+    let is_owner: Option<bool> = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM guilds WHERE id = $1 AND owner_id = $2)"
+    )
+    .bind(guild_id)
+    .bind(user_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let is_owner = is_owner.unwrap_or(false);
+    if is_owner {
+        return Err("You are the owner of this guild. Transfer ownership or delete the guild first".to_string());
+    }
+
+    let mut transaction = pool.begin()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // 1. Удаляем роли пользователя в этой гильдии
+    sqlx::query(
+        "DELETE FROM member_roles WHERE user_id = $1 AND guild_id = $2"
+    )
+    .bind(user_id)
+    .bind(guild_id)
+    .execute(&mut *transaction)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    // 2. Удаляем голосовые состояния пользователя в комнатах этой гильдии
+    sqlx::query(
+        "DELETE FROM voice_states WHERE user_id = $1 AND room_id IN (SELECT id FROM rooms WHERE guild_id = $2)"
+    )
+    .bind(user_id)
+    .bind(guild_id)
+    .execute(&mut *transaction)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    // 3. Удаляем участника из гильдии
+    sqlx::query(
+        "DELETE FROM guild_members WHERE user_id = $1 AND guild_id = $2"
+    )
+    .bind(user_id)
+    .bind(guild_id)
+    .execute(&mut *transaction)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    // 4. Аудит-лог
+    let now = Utc::now();
+    let changes_str = json!({ "user_id": user_id }).to_string();
+
+    sqlx::query(
+        "INSERT INTO audit_logs (guild_id, user_id, action_type, target_id, changes, created_at)
+        VALUES ($1, $2, 'MEMBER_LEFT', $3, $4::jsonb, $5)"
+    )
+    .bind(guild_id)
+    .bind(user_id)
+    .bind(user_id)
+    .bind(changes_str)
+    .bind(now)
+    .execute(&mut *transaction)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    transaction.commit()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Получаем информацию о пользователе для уведомления
+    let user_row = sqlx::query(
+        "SELECT username, avatar FROM users WHERE id = $1"
+    )
+    .bind(user_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| e.to_string())?;
+    
+    let username: String = user_row.get(0);
+    let avatar: Option<String> = user_row.get(1);
+
+    // Уведомляем всех в гильдии о выходе участника
+    let user_left_data = json!({
+        "user_id": user_id,
+        "username": username,
+        "avatar": avatar,
+        "guild_id": guild_id
+    });
+
+    let ws_msg = WsMessage::new("user_left_guild", user_left_data)
+        .with_guild(guild_id);
+    manager.broadcast_to_guild(guild_id, ws_msg).await;
+
+    // Уведомляем самого пользователя, что он покинул гильдию
+    let left_confirmation = WsMessage::new("guild_left", json!({
+        "guild_id": guild_id,
+        "success": true
+    }));
+    
+    // Отправляем пользователю личное сообщение
+    manager.send_to_user_by_user_id(user_id, left_confirmation).await;
+
+    println!("👋 User {} (ID: {}) left guild {}", username, user_id, guild_id);
 
     Ok(true)
 }
