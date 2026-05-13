@@ -157,6 +157,7 @@ class ApiService {
                 user_id: userId, 
                 guild_id: guildId 
             });
+            console.log(`getUserPermissionsInGuild result for user ${userId}:`, result);
             return result.permissions || 0;
         } catch (err) {
             console.error('Get user permissions error:', err);

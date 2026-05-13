@@ -1,7 +1,7 @@
 // src/components/UserPermissionsModal.tsx
 import { useEffect, useState } from 'react';
 import { apiService } from '../features/api.service';
-import { wsService } from '../features/websocket.service';
+import { storeAPI } from '../features/useStore';
 import './UserPermissionsModal.css';
 
 interface UserPermissionsModalProps {
@@ -52,24 +52,26 @@ export function UserPermissionsModal({
     const [selectedPermissions, setSelectedPermissions] = useState<Set<number>>(new Set());
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+    const [loadKey, setLoadKey] = useState(0);
 
-    useEffect(() => {
-        setCurrentUserId(wsService.getCurrentUserId());
-    }, []);
-
+    // Загружаем права при открытии модального окна или изменении userId/guildId
     useEffect(() => {
         if (isOpen && guildId && userId) {
+            console.log(`Loading permissions for user ${userId} (${username}) in guild ${guildId}`);
             loadPermissions();
         }
-    }, [isOpen, guildId, userId]);
+    }, [isOpen, guildId, userId, loadKey]);
 
     const loadPermissions = async () => {
         setLoading(true);
         try {
-            // ВАЖНО: загружаем права для целевого пользователя (userId), а не текущего
+            // Очищаем кэш для этого пользователя
+            const cacheKey = `user_permissions_${guildId}_${userId}`;
+            await storeAPI.delete(cacheKey);
+            
+            // Загружаем права для целевого пользователя
             const perms = await apiService.getUserPermissionsInGuild(userId, guildId);
-            console.log(`Loaded permissions for user ${userId} (${username}): ${perms}`);
+            console.log(`Loaded permissions for user ${userId} (${username}): ${perms} (binary: ${perms.toString(2)})`);
             setCurrentPermissions(perms);
             
             // Инициализируем выбранные права из текущих
@@ -135,14 +137,24 @@ export function UserPermissionsModal({
         setSaving(true);
         try {
             const newPermissions = calculateNewPermissions();
-            console.log(`Saving permissions for user ${userId} in guild ${guildId}: ${newPermissions}`);
+            console.log(`Saving permissions for user ${userId} in guild ${guildId}: ${newPermissions} (binary: ${newPermissions.toString(2)})`);
             
             // Используем прямой метод обновления прав пользователя
             const result = await apiService.updateUserPermissionsDirect(userId, guildId, newPermissions);
             
             if (result) {
                 console.log('Permissions updated successfully');
+                
+                // Очищаем кэш
+                await storeAPI.delete(`user_permissions_${guildId}_${userId}`);
+                
+                // Обновляем локальное состояние
+                setCurrentPermissions(newPermissions);
+                
+                // Уведомляем родительский компонент
                 onPermissionsUpdated();
+                
+                // Закрываем модальное окно
                 onClose();
             } else {
                 console.error('Failed to update permissions');
@@ -175,8 +187,7 @@ export function UserPermissionsModal({
                 
                 <div className="permissions-modal-body">
                     <p className="target-user">
-                        Пользователь: <strong>{username}</strong>
-                        {currentUserId === userId && <span className="self-badge"> (Вы)</span>}
+                        Пользователь: <strong>{username}</strong> (ID: {userId})
                     </p>
                     
                     {loading ? (
@@ -184,9 +195,9 @@ export function UserPermissionsModal({
                     ) : (
                         <>
                             <div className="permissions-summary">
-                                <span>Текущие права: </span>
+                                <span>Текущие права (битовая маска): </span>
                                 <code className="permissions-bits">
-                                    {currentPermissions.toString(2).padStart(32, '0')}
+                                    {currentPermissions} = {currentPermissions.toString(2).padStart(32, '0')}
                                 </code>
                             </div>
                             <div className="permissions-groups">
@@ -219,7 +230,9 @@ export function UserPermissionsModal({
                                                         <span className="permission-name">{perm.name}</span>
                                                         <span className="permission-description">{perm.description}</span>
                                                     </div>
-                                                    <code className="permission-bit">{(perm.bit).toString(2)}</code>
+                                                    <code className="permission-bit">
+                                                        {perm.bit} = {(perm.bit).toString(2)}
+                                                    </code>
                                                 </label>
                                             ))}
                                         </div>

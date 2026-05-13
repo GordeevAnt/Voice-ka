@@ -289,34 +289,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                         }
 
                                         "get_user_permissions_in_guild" => {
-                                            if let (Some(uid), Some(data)) = (current_user_id, client_msg.data) {
-                                                if uid > 0 {
-                                                    if let Some(guild_id) = data.get("guild_id").and_then(|v| v.as_i64()) {
-                                                        println!("🔐 Getting permissions for user {} in guild {}", uid, guild_id);
-                                                        match handlers::guild::handle_get_user_permissions_in_guild(uid, guild_id as i32).await {
-                                                            Ok(permissions) => {
-                                                                println!("✅ Found permissions: {}", permissions);
-                                                                let resp = WsMessage::success_response(request_id, json!({ "permissions": permissions }));
-                                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
-                                                                    serde_json::to_string(&resp).unwrap()
-                                                                ));
-                                                            }
-                                                            Err(e) => {
-                                                                println!("❌ Error getting permissions: {}", e);
-                                                                let resp = WsMessage::error_response(request_id, &e);
-                                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
-                                                                    serde_json::to_string(&resp).unwrap()
-                                                                ));
-                                                            }
+                                            if let (Some(_uid), Some(data)) = (current_user_id, client_msg.data) {
+                                                // Используем переданный user_id из data, а не текущий
+                                                if let (Some(target_user_id), Some(guild_id)) = (
+                                                    data.get("user_id").and_then(|v| v.as_i64()),
+                                                    data.get("guild_id").and_then(|v| v.as_i64())
+                                                ) {
+                                                    println!("🔐 Getting permissions for user {} in guild {}", target_user_id, guild_id);
+                                                    match handlers::guild::handle_get_user_permissions_in_guild(target_user_id as i32, guild_id as i32).await {
+                                                        Ok(permissions) => {
+                                                            println!("✅ Found permissions: {}", permissions);
+                                                            let resp = WsMessage::success_response(request_id, json!({ "permissions": permissions }));
+                                                            let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                serde_json::to_string(&resp).unwrap()
+                                                            ));
                                                         }
-                                                    } else {
-                                                        let resp = WsMessage::error_response(request_id, "Missing guild_id");
-                                                        let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
-                                                            serde_json::to_string(&resp).unwrap()
-                                                        ));
+                                                        Err(e) => {
+                                                            println!("❌ Error getting permissions: {}", e);
+                                                            let resp = WsMessage::error_response(request_id, &e);
+                                                            let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                serde_json::to_string(&resp).unwrap()
+                                                            ));
+                                                        }
                                                     }
                                                 } else {
-                                                    let resp = WsMessage::error_response(request_id, "Not authenticated");
+                                                    let resp = WsMessage::error_response(request_id, "Missing user_id or guild_id");
                                                     let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
                                                         serde_json::to_string(&resp).unwrap()
                                                     ));
