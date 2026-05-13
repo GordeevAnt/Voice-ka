@@ -218,57 +218,306 @@ async fn seed_database(pool: &PgPool) -> Result<(), Box<dyn std::error::Error>> 
 
     // 4. Роли
     println!("  → Добавление ролей...");
+
+    // Удаляем существующие роли
+    sqlx::query("DELETE FROM roles WHERE guild_id IN (1, 2)")
+        .execute(pool)
+        .await?;
+
+    // Вставляем базовые роли
     sqlx::query(
         r#"
-        INSERT INTO roles (id, guild_id, name, color, position, permissions, hoist, is_mentionable, created_at, updated_at)
+        INSERT INTO roles (guild_id, name, color, position, permissions, hoist, is_mentionable, created_at, updated_at)
         VALUES 
-            (1, 1, 'Admin', '#FF0000', 100, 0, true, true, '2024-01-20 12:00:00+00', '2024-01-20 12:00:00+00'),
-            (2, 1, 'Moderator', '#00FF00', 50, 0, true, true, '2024-01-20 12:00:00+00', '2024-01-20 12:00:00+00'),
-            (3, 2, 'VIP', '#FFD700', 30, 0, true, true, '2024-02-25 18:30:00+00', '2024-02-25 18:30:00+00'),
-            (4, 2, '@everyone', '#99AAB5', 0, 0, false, false, '2024-02-25 18:30:00+00', '2024-02-25 18:30:00+00')
-        "#,
+            (1, 'Admin', '#FF0000', 100, 0, true, true, NOW(), NOW()),
+            (1, 'Moderator', '#00FF00', 50, 0, true, true, NOW(), NOW()),
+            (1, '@everyone', '#99AAB5', 0, 0, false, false, NOW(), NOW()),
+            (2, 'Admin', '#FF0000', 100, 0, true, true, NOW(), NOW()),
+            (2, 'VIP', '#FFD700', 30, 0, true, true, NOW(), NOW()),
+            (2, '@everyone', '#99AAB5', 0, 0, false, false, NOW(), NOW())
+        "#
     )
     .execute(pool)
     .await?;
 
-    // Обновляем права ролей
+    // Получаем ID созданных ролей для guild 1
+    let admin_role_id_guild1: i32 = sqlx::query_scalar(
+        "SELECT id FROM roles WHERE guild_id = 1 AND name = 'Admin' LIMIT 1"
+    )
+    .fetch_one(pool)
+    .await?;
+
+    let moderator_role_id: i32 = sqlx::query_scalar(
+        "SELECT id FROM roles WHERE guild_id = 1 AND name = 'Moderator' LIMIT 1"
+    )
+    .fetch_one(pool)
+    .await?;
+
+    let everyone_role_id_guild1: i32 = sqlx::query_scalar(
+        "SELECT id FROM roles WHERE guild_id = 1 AND name = '@everyone' LIMIT 1"
+    )
+    .fetch_one(pool)
+    .await?;
+
+    // Получаем ID созданных ролей для guild 2
+    let admin_role_id_guild2: i32 = sqlx::query_scalar(
+        "SELECT id FROM roles WHERE guild_id = 2 AND name = 'Admin' LIMIT 1"
+    )
+    .fetch_one(pool)
+    .await?;
+
+    let vip_role_id: i32 = sqlx::query_scalar(
+        "SELECT id FROM roles WHERE guild_id = 2 AND name = 'VIP' LIMIT 1"
+    )
+    .fetch_one(pool)
+    .await?;
+
+    let everyone_role_id_guild2: i32 = sqlx::query_scalar(
+        "SELECT id FROM roles WHERE guild_id = 2 AND name = '@everyone' LIMIT 1"
+    )
+    .fetch_one(pool)
+    .await?;
+
+    // 5. Настройка прав ролей
     println!("  → Настройка прав ролей...");
 
-    // Admin: все права (полный доступ)
-    sqlx::query("UPDATE roles SET permissions = 2147483647 WHERE id = 1")
+    // Права (bits):
+    // 1 << 1 = 2   - EDIT_GUILD
+    // 1 << 2 = 4   - CREATE_ROOMS  
+    // 1 << 3 = 8   - EDIT_ROOMS
+    // 1 << 4 = 16  - BAN_MEMBERS
+    // 1 << 5 = 32  - KICK_MEMBERS
+    // 1 << 6 = 64  - SEND_MESSAGES
+
+    // Admin guild 1: все права (2+4+8+16+32+64 = 126)
+    sqlx::query("UPDATE roles SET permissions = 126 WHERE id = $1")
+        .bind(admin_role_id_guild1)
         .execute(pool)
         .await?;
 
-    // Moderator: EDIT_GUILD(2) | CREATE_ROOMS(4) | EDIT_ROOMS(8) | SEND_MESSAGES(16) = 30
-    sqlx::query("UPDATE roles SET permissions = 30 WHERE id = 2")
+    // Moderator: EDIT_GUILD(2) | CREATE_ROOMS(4) | EDIT_ROOMS(8) | SEND_MESSAGES(64) | KICK_MEMBERS(32) = 110
+    sqlx::query("UPDATE roles SET permissions = 110 WHERE id = $1")
+        .bind(moderator_role_id)
         .execute(pool)
         .await?;
 
-    // VIP: только SEND_MESSAGES(16)
-    sqlx::query("UPDATE roles SET permissions = 16 WHERE id = 3")
+    // @everyone guild 1: только отправка сообщений (64)
+    sqlx::query("UPDATE roles SET permissions = 64 WHERE id = $1")
+        .bind(everyone_role_id_guild1)
         .execute(pool)
         .await?;
 
-    // @everyone: нет прав
-    sqlx::query("UPDATE roles SET permissions = 0 WHERE id = 4")
+    // Admin guild 2: все права (126)
+    sqlx::query("UPDATE roles SET permissions = 126 WHERE id = $1")
+        .bind(admin_role_id_guild2)
         .execute(pool)
         .await?;
 
-    // 5. Назначение ролей пользователям
-    println!("  → Назначение ролей пользователям...");
-    sqlx::query(
-        r#"
-        INSERT INTO member_roles (id, user_id, role_id, guild_id)
-        VALUES 
-            (1, 4, 1, 1),     -- admin_serg: Admin (все права)
-            (2, 1, 2, 1),     -- alex_kot: Moderator (30)
-            (3, 3, 2, 1),     -- lena_voise: Moderator (30)
-            (4, 2, 3, 2),     -- dj_max: VIP (только отправка сообщений)
-            (5, 5, 4, 2)      -- guest_oleg: @everyone (нет прав)
-        "#,
+    // VIP: SEND_MESSAGES(64) | CREATE_ROOMS(4) = 68
+    sqlx::query("UPDATE roles SET permissions = 68 WHERE id = $1")
+        .bind(vip_role_id)
+        .execute(pool)
+        .await?;
+
+    // @everyone guild 2: только отправка сообщений (64)
+    sqlx::query("UPDATE roles SET permissions = 64 WHERE id = $1")
+        .bind(everyone_role_id_guild2)
+        .execute(pool)
+        .await?;
+
+    // Добавляем дополнительные роли для guild_id = 1
+    // Роль "Member" для обычных участников (только отправка сообщений)
+    let member_role_id: i32 = sqlx::query_scalar(
+        "INSERT INTO roles (guild_id, name, color, position, permissions, created_at, updated_at)
+        VALUES (1, 'Member', '#99AAB5', 25, 64, NOW(), NOW())
+        RETURNING id"
     )
+    .fetch_one(pool)
+    .await?;
+
+    // Роль "Voice Master" для голосовых прав
+    let voice_master_id: i32 = sqlx::query_scalar(
+        "INSERT INTO roles (guild_id, name, color, position, permissions, created_at, updated_at)
+        VALUES (1, 'Voice Master', '#00FF00', 40, 0, NOW(), NOW())
+        RETURNING id"
+    )
+    .fetch_one(pool)
+    .await?;
+
+    // Добавляем роль "Guest" для guild_id = 2
+    let guest_role_id: i32 = sqlx::query_scalar(
+        "INSERT INTO roles (guild_id, name, color, position, permissions, created_at, updated_at)
+        VALUES (2, 'Guest', '#808080', 10, 64, NOW(), NOW())
+        RETURNING id"
+    )
+    .fetch_one(pool)
+    .await?;
+
+    // Роль "DJ" для guild_id = 2 (специальные права)
+    let dj_role_id: i32 = sqlx::query_scalar(
+        "INSERT INTO roles (guild_id, name, color, position, permissions, created_at, updated_at)
+        VALUES (2, 'DJ', '#FF9900', 45, 68, NOW(), NOW())
+        RETURNING id"
+    )
+    .fetch_one(pool)
+    .await?;
+
+    println!("  → Назначение ролей пользователям...");
+
+    // Очищаем существующие назначения ролей
+    sqlx::query("DELETE FROM member_roles")
+        .execute(pool)
+        .await?;
+
+    // ========== НАЗНАЧЕНИЕ РОЛЕЙ ДЛЯ GUILD 1 (Voice-ka) ==========
+    // Владелец: alex_kot (user_id 1) - получает роль Admin (все права)
+    sqlx::query(
+        "INSERT INTO member_roles (user_id, role_id, guild_id) VALUES ($1, $2, $3)"
+    )
+    .bind(1)  // alex_kot - ВЛАДЕЛЕЦ
+    .bind(admin_role_id_guild1)  // Admin role
+    .bind(1)  // guild_id 1
     .execute(pool)
     .await?;
+
+    // admin_serg (user_id 4) - получает роль Moderator
+    sqlx::query(
+        "INSERT INTO member_roles (user_id, role_id, guild_id) VALUES ($1, $2, $3)"
+    )
+    .bind(4)  // admin_serg
+    .bind(moderator_role_id)  // Moderator role
+    .bind(1)  // guild_id 1
+    .execute(pool)
+    .await?;
+
+    // lena_voise (user_id 3) - получает роль Member
+    sqlx::query(
+        "INSERT INTO member_roles (user_id, role_id, guild_id) VALUES ($1, $2, $3)"
+    )
+    .bind(3)  // lena_voise
+    .bind(member_role_id)  // Member role
+    .bind(1)  // guild_id 1
+    .execute(pool)
+    .await?;
+
+    // dj_max (user_id 2) - получает роль Voice Master в гильдии 1
+    sqlx::query(
+        "INSERT INTO member_roles (user_id, role_id, guild_id) VALUES ($1, $2, $3)"
+    )
+    .bind(2)  // dj_max
+    .bind(voice_master_id)  // Voice Master role
+    .bind(1)  // guild_id 1
+    .execute(pool)
+    .await?;
+
+    // guest_oleg (user_id 5) - получает роль Member в гильдии 1
+    sqlx::query(
+        "INSERT INTO member_roles (user_id, role_id, guild_id) VALUES ($1, $2, $3)"
+    )
+    .bind(5)  // guest_oleg
+    .bind(member_role_id)  // Member role
+    .bind(1)  // guild_id 1
+    .execute(pool)
+    .await?;
+
+    // ========== НАЗНАЧЕНИЕ РОЛЕЙ ДЛЯ GUILD 2 (Music Hub) ==========
+    // Владелец: dj_max (user_id 2) - получает роль Admin (все права)
+    sqlx::query(
+        "INSERT INTO member_roles (user_id, role_id, guild_id) VALUES ($1, $2, $3)"
+    )
+    .bind(2)  // dj_max - ВЛАДЕЛЕЦ
+    .bind(admin_role_id_guild2)  // Admin role for guild 2
+    .bind(2)  // guild_id 2
+    .execute(pool)
+    .await?;
+
+    // alex_kot (user_id 1) - получает роль DJ в гильдии 2
+    sqlx::query(
+        "INSERT INTO member_roles (user_id, role_id, guild_id) VALUES ($1, $2, $3)"
+    )
+    .bind(1)  // alex_kot
+    .bind(dj_role_id)  // DJ role
+    .bind(2)  // guild_id 2
+    .execute(pool)
+    .await?;
+
+    // admin_serg (user_id 4) - получает роль VIP в гильдии 2
+    sqlx::query(
+        "INSERT INTO member_roles (user_id, role_id, guild_id) VALUES ($1, $2, $3)"
+    )
+    .bind(4)  // admin_serg
+    .bind(vip_role_id)  // VIP role
+    .bind(2)  // guild_id 2
+    .execute(pool)
+    .await?;
+
+    // guest_oleg (user_id 5) - получает роль Guest в гильдии 2
+    sqlx::query(
+        "INSERT INTO member_roles (user_id, role_id, guild_id) VALUES ($1, $2, $3)"
+    )
+    .bind(5)  // guest_oleg
+    .bind(guest_role_id)  // Guest role
+    .bind(2)  // guild_id 2
+    .execute(pool)
+    .await?;
+
+    // lena_voise (user_id 3) - получает роль @everyone в гильдии 2
+    sqlx::query(
+        "INSERT INTO member_roles (user_id, role_id, guild_id) VALUES ($1, $2, $3)"
+    )
+    .bind(3)  // lena_voise
+    .bind(everyone_role_id_guild2)  // @everyone role
+    .bind(2)  // guild_id 2
+    .execute(pool)
+    .await?;
+
+    // ========== ДОБАВЛЯЕМ РОЛЬ @everyone ДЛЯ ВСЕХ УЧАСТНИКОВ ==========
+    // Добавляем @everyone для всех участников guild 1, у кого её нет
+    sqlx::query(
+        "INSERT INTO member_roles (user_id, role_id, guild_id)
+        SELECT gm.user_id, $1, gm.guild_id
+        FROM guild_members gm
+        WHERE gm.guild_id = 1
+        AND NOT EXISTS (
+            SELECT 1 FROM member_roles mr 
+            WHERE mr.user_id = gm.user_id AND mr.role_id = $1 AND mr.guild_id = gm.guild_id
+        )"
+    )
+    .bind(everyone_role_id_guild1)
+    .execute(pool)
+    .await?;
+
+    // Добавляем @everyone для всех участников guild 2, у кого её нет
+    sqlx::query(
+        "INSERT INTO member_roles (user_id, role_id, guild_id)
+        SELECT gm.user_id, $1, gm.guild_id
+        FROM guild_members gm
+        WHERE gm.guild_id = 2
+        AND NOT EXISTS (
+            SELECT 1 FROM member_roles mr 
+            WHERE mr.user_id = gm.user_id AND mr.role_id = $1 AND mr.guild_id = gm.guild_id
+        )"
+    )
+    .bind(everyone_role_id_guild2)
+    .execute(pool)
+    .await?;
+
+    println!("  → Права ролей настроены:");
+    println!("     GUILD 1 (Voice-ka) - Владелец: alex_kot (id=1)");
+    println!("       • alex_kot (владелец): Admin - ВСЕ права");
+    println!("       • admin_serg: Moderator - EDIT_GUILD | CREATE_ROOMS | EDIT_ROOMS | KICK_MEMBERS | SEND_MESSAGES");
+    println!("       • lena_voise: Member - SEND_MESSAGES");
+    println!("       • dj_max: Voice Master - специальные голосовые права");
+    println!("       • guest_oleg: Member - SEND_MESSAGES");
+    println!("       • Все: @everyone - SEND_MESSAGES");
+    println!("");
+    println!("     GUILD 2 (Music Hub) - Владелец: dj_max (id=2)");
+    println!("       • dj_max (владелец): Admin - ВСЕ права");
+    println!("       • alex_kot: DJ - SEND_MESSAGES | CREATE_ROOMS");
+    println!("       • admin_serg: VIP - SEND_MESSAGES | CREATE_ROOMS");
+    println!("       • guest_oleg: Guest - SEND_MESSAGES");
+    println!("       • lena_voise: @everyone - SEND_MESSAGES");
+    println!("       • Все: @everyone - SEND_MESSAGES");
 
     // 6. Комнаты
     println!("  → Добавление комнат...");

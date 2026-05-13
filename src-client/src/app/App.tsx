@@ -1,7 +1,7 @@
 import { Route, Routes } from "react-router-dom";
 import Layout from "./Layout";
-import { Auth_Page } from "../pages/Auth_Page"
-import { Register_Page } from "../pages/Register_Page";
+import { Auth_Page } from "../features/auth/Auth_Page"
+import { Register_Page } from "../features/auth/Register_Page";
 import { Logined_Layout } from "../app/Logined_Layout"
 import { Main_Page } from "../pages/Main_Page";
 import { Chanel_Info_Page } from "../pages/Chanel_Info_Page";

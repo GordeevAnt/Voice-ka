@@ -1,9 +1,9 @@
 // Auth_Page.tsx
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { storeAPI } from "../features/useStore";
-import { apiService } from "../features/api.service";
-import { wsService } from "../features/websocket.service";
+import { storeAPI } from "../useStore";
+import { apiService } from "../api.service";
+import { wsService } from "../websocket.service";
 
 import "./Auth_Page.css"
 

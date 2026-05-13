@@ -1,7 +1,7 @@
 // Logout.tsx
 import { useNavigate } from "react-router-dom";
-import { storeAPI } from "../features/useStore";
-import { apiService } from "../features/api.service";
+import { storeAPI } from "../useStore";
+import { apiService } from "../api.service";
 
 export function Logout() {
     const navigate = useNavigate();

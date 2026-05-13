@@ -698,3 +698,171 @@ pub async fn handle_update_guild(
         None => Err("Guild not found".to_string())
     }
 }
+
+pub async fn handle_get_guild_roles(guild_id: i32) -> Result<Vec<serde_json::Value>, String> {
+    let pool = get_db_pool();
+
+    let roles = sqlx::query(
+        "SELECT id, name, permissions, color, position 
+         FROM roles 
+         WHERE guild_id = $1 
+         ORDER BY position ASC"
+    )
+    .bind(guild_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| format!("Failed to get guild roles: {}", e))?;
+
+    Ok(roles.into_iter().map(|row| {
+        let id: i32 = row.get(0);
+        let name: String = row.get(1);
+        let permissions: i64 = row.get(2);
+        let color: Option<String> = row.get(3);
+        let position: i32 = row.get(4);
+        
+        json!({
+            "id": id,
+            "name": name,
+            "permissions": permissions,
+            "color": color,
+            "position": position
+        })
+    }).collect())
+}
+
+pub async fn handle_update_user_roles(
+    requester_id: i32,
+    guild_id: i32,
+    target_user_id: i32,
+    role_ids: Vec<i32>,
+    manager: Arc<SubscriptionManager>,
+) -> Result<bool, String> {
+    let pool = get_db_pool();
+
+    // Проверяем права запрашивающего (должен быть владельцем)
+    let is_owner: Option<bool> = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM guilds WHERE id = $1 AND owner_id = $2)"
+    )
+    .bind(guild_id)
+    .bind(requester_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let is_owner = is_owner.unwrap_or(false);
+    if !is_owner {
+        return Err("Only guild owner can manage roles".to_string());
+    }
+
+    let mut transaction = pool.begin()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Удаляем все текущие роли пользователя в этой гильдии (кроме @everyone)
+    sqlx::query(
+        "DELETE FROM member_roles 
+        WHERE user_id = $1 AND guild_id = $2 
+        AND role_id NOT IN (SELECT id FROM roles WHERE guild_id = $2 AND name = '@everyone')"
+    )
+    .bind(target_user_id)
+    .bind(guild_id)
+    .execute(&mut *transaction)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    // Добавляем новые роли
+    for &role_id in &role_ids {  // Используем &role_id вместо role_id
+        // Проверяем, что роль принадлежит этой гильдии
+        let role_exists: Option<bool> = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM roles WHERE id = $1 AND guild_id = $2)"
+        )
+        .bind(role_id)  // Теперь role_id - i32, а не ссылка
+        .bind(guild_id)
+        .fetch_one(&mut *transaction)
+        .await
+        .map_err(|e| e.to_string())?;
+
+        if role_exists.unwrap_or(false) {
+            sqlx::query(
+                "INSERT INTO member_roles (user_id, role_id, guild_id)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (user_id, role_id, guild_id) DO NOTHING"
+            )
+            .bind(target_user_id)
+            .bind(role_id)
+            .bind(guild_id)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|e| e.to_string())?;
+        }
+    }
+
+    // Аудит-лог
+    let now = Utc::now();
+    let changes_str = json!({ 
+        "action": "update_roles", 
+        "user_id": target_user_id, 
+        "role_ids": role_ids 
+    }).to_string();
+
+    sqlx::query(
+        "INSERT INTO audit_logs (guild_id, user_id, action_type, target_id, changes, created_at)
+         VALUES ($1, $2, 'UPDATE_ROLES', $3, $4::jsonb, $5)"
+    )
+    .bind(guild_id)
+    .bind(requester_id)
+    .bind(target_user_id)
+    .bind(changes_str)
+    .bind(now)
+    .execute(&mut *transaction)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    transaction.commit()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Получаем обновленные права пользователя
+    let new_permissions = handle_get_user_permissions_in_guild(target_user_id, guild_id).await?;
+    
+    // Получаем информацию о пользователе
+    let user_row = sqlx::query(
+        "SELECT username, avatar, status FROM users WHERE id = $1"
+    )
+    .bind(target_user_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| e.to_string())?;
+    
+    let username: String = user_row.get(0);
+    let avatar: Option<String> = user_row.get(1);
+    let status: String = user_row.get(2);
+
+    // Уведомляем пользователя об изменении его прав
+    let permissions_data = json!({
+        "guild_id": guild_id,
+        "permissions": new_permissions,
+        "user_id": target_user_id,
+        "username": username,
+        "avatar": avatar,
+        "status": status
+    });
+
+    let ws_message = WsMessage::new("user_permissions_updated", permissions_data);
+    manager.send_to_user_by_user_id(target_user_id, ws_message).await;
+
+    // Уведомляем всех в гильдии, что у пользователя обновились права (для обновления UI)
+    let roles_updated_data = json!({
+        "guild_id": guild_id,
+        "user_id": target_user_id,
+        "username": username
+    });
+    
+    let broadcast_msg = WsMessage::new("user_roles_updated", roles_updated_data)
+        .with_guild(guild_id);
+    manager.broadcast_to_guild(guild_id, broadcast_msg).await;
+
+    println!("📝 Updated roles for user {} (ID: {}) in guild {}", username, target_user_id, guild_id);
+
+    Ok(true)
+}

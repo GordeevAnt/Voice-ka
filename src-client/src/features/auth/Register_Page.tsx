@@ -1,8 +1,8 @@
 // Register_Page.tsx
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { apiService } from "../features/api.service";
-import { storeAPI } from "../features/useStore";
+import { apiService } from "../api.service";
+import { storeAPI } from "../useStore";
 import "./Register_Page.css";
 
 export function Register_Page() {

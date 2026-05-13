@@ -528,6 +528,445 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                             }
                                         }
 
+                                        "get_guild_roles" => {
+                                            if let Some(guild_id) = client_msg.guild_id {
+                                                match handlers::guild::handle_get_guild_roles(guild_id).await {
+                                                    Ok(roles) => {
+                                                        let resp = WsMessage::success_response(request_id, json!({ "roles": roles }));
+                                                        let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                            serde_json::to_string(&resp).unwrap()
+                                                        ));
+                                                    }
+                                                    Err(e) => {
+                                                        let resp = WsMessage::error_response(request_id, &e);
+                                                        let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                            serde_json::to_string(&resp).unwrap()
+                                                        ));
+                                                    }
+                                                }
+                                            } else {
+                                                let resp = WsMessage::error_response(request_id, "Missing guild_id");
+                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                    serde_json::to_string(&resp).unwrap()
+                                                ));
+                                            }
+                                        }
+
+                                        "create_user_role" => {
+                                            if let (Some(uid), Some(guild_id), Some(data)) = (current_user_id, client_msg.guild_id, client_msg.data) {
+                                                if uid > 0 {
+                                                    // Проверяем, что пользователь - владелец гильдии
+                                                    let is_owner_result: Result<Option<bool>, _> = sqlx::query_scalar(
+                                                        "SELECT EXISTS(SELECT 1 FROM guilds WHERE id = $1 AND owner_id = $2)"
+                                                    )
+                                                    .bind(guild_id)
+                                                    .bind(uid)
+                                                    .fetch_one(db::get_db_pool())
+                                                    .await;
+                                                    
+                                                    match is_owner_result {
+                                                        Ok(is_owner_opt) => {
+                                                            let is_owner = is_owner_opt.unwrap_or(false);
+                                                            if is_owner {
+                                                                if let (Some(target_user_id), Some(permissions), Some(role_name)) = (
+                                                                    data.get("user_id").and_then(|v| v.as_i64()),
+                                                                    data.get("permissions").and_then(|v| v.as_i64()),
+                                                                    data.get("name").and_then(|v| v.as_str())
+                                                                ) {
+                                                                    // Создаем новую роль для пользователя
+                                                                    let create_result = sqlx::query_scalar::<_, i32>(
+                                                                        "INSERT INTO roles (guild_id, name, position, permissions, created_at, updated_at)
+                                                                        VALUES ($1, $2, 0, $3, NOW(), NOW())
+                                                                        RETURNING id"
+                                                                    )
+                                                                    .bind(guild_id)
+                                                                    .bind(role_name)
+                                                                    .bind(permissions)
+                                                                    .fetch_one(db::get_db_pool())
+                                                                    .await;
+                                                                    
+                                                                    match create_result {
+                                                                        Ok(role_id) => {
+                                                                            // Назначаем роль пользователю
+                                                                            let assign_result = sqlx::query(
+                                                                                "INSERT INTO member_roles (user_id, role_id, guild_id)
+                                                                                VALUES ($1, $2, $3)
+                                                                                ON CONFLICT (user_id, role_id, guild_id) DO NOTHING"
+                                                                            )
+                                                                            .bind(target_user_id as i32)
+                                                                            .bind(role_id)
+                                                                            .bind(guild_id)
+                                                                            .execute(db::get_db_pool())
+                                                                            .await;
+                                                                            
+                                                                            match assign_result {
+                                                                                Ok(_) => {
+                                                                                    // Уведомляем пользователя об изменении прав
+                                                                                    let update_data = json!({
+                                                                                        "guild_id": guild_id,
+                                                                                        "permissions": permissions,
+                                                                                        "user_id": target_user_id
+                                                                                    });
+                                                                                    
+                                                                                    let ws_message = WsMessage::new("user_permissions_updated", update_data);
+                                                                                    manager.send_to_user_by_user_id(target_user_id as i32, ws_message).await;
+                                                                                    
+                                                                                    let resp = WsMessage::success_response(request_id, json!({ "success": true }));
+                                                                                    let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                                        serde_json::to_string(&resp).unwrap()
+                                                                                    ));
+                                                                                }
+                                                                                Err(e) => {
+                                                                                    let resp = WsMessage::error_response(request_id, &format!("Failed to assign role: {}", e));
+                                                                                    let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                                        serde_json::to_string(&resp).unwrap()
+                                                                                    ));
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                        Err(e) => {
+                                                                            let resp = WsMessage::error_response(request_id, &format!("Failed to create role: {}", e));
+                                                                            let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                                serde_json::to_string(&resp).unwrap()
+                                                                            ));
+                                                                        }
+                                                                    }
+                                                                } else {
+                                                                    let resp = WsMessage::error_response(request_id, "Missing user_id, permissions or name");
+                                                                    let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                        serde_json::to_string(&resp).unwrap()
+                                                                    ));
+                                                                }
+                                                            } else {
+                                                                let resp = WsMessage::error_response(request_id, "Only guild owner can manage permissions");
+                                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                    serde_json::to_string(&resp).unwrap()
+                                                                ));
+                                                            }
+                                                        }
+                                                        Err(e) => {
+                                                            let resp = WsMessage::error_response(request_id, &format!("Database error: {}", e));
+                                                            let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                serde_json::to_string(&resp).unwrap()
+                                                            ));
+                                                        }
+                                                    }
+                                                } else {
+                                                    let resp = WsMessage::error_response(request_id, "Not authenticated");
+                                                    let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                        serde_json::to_string(&resp).unwrap()
+                                                    ));
+                                                }
+                                            } else {
+                                                let resp = WsMessage::error_response(request_id, "Missing required fields");
+                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                    serde_json::to_string(&resp).unwrap()
+                                                ));
+                                            }
+                                        }
+
+                                        "update_user_roles" => {
+                                            if let (Some(uid), Some(guild_id), Some(data)) = (current_user_id, client_msg.guild_id, client_msg.data) {
+                                                if uid > 0 {
+                                                    if let (Some(target_user_id), Some(role_ids)) = (
+                                                        data.get("user_id").and_then(|v| v.as_i64()),
+                                                        data.get("role_ids").and_then(|v| v.as_array())
+                                                    ) {
+                                                        let role_ids_vec: Vec<i32> = role_ids
+                                                            .iter()
+                                                            .filter_map(|v| v.as_i64())
+                                                            .map(|v| v as i32)
+                                                            .collect();
+                                                        
+                                                        match handlers::guild::handle_update_user_roles(
+                                                            uid, 
+                                                            guild_id, 
+                                                            target_user_id as i32, 
+                                                            role_ids_vec, 
+                                                            manager.clone()
+                                                        ).await {
+                                                            Ok(success) => {
+                                                                let resp = WsMessage::success_response(request_id, json!({ "success": success }));
+                                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                    serde_json::to_string(&resp).unwrap()
+                                                                ));
+                                                            }
+                                                            Err(e) => {
+                                                                let resp = WsMessage::error_response(request_id, &e);
+                                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                    serde_json::to_string(&resp).unwrap()
+                                                                ));
+                                                            }
+                                                        }
+                                                    } else {
+                                                        let resp = WsMessage::error_response(request_id, "Missing user_id or role_ids");
+                                                        let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                            serde_json::to_string(&resp).unwrap()
+                                                        ));
+                                                    }
+                                                } else {
+                                                    let resp = WsMessage::error_response(request_id, "Not authenticated");
+                                                    let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                        serde_json::to_string(&resp).unwrap()
+                                                    ));
+                                                }
+                                            } else {
+                                                let resp = WsMessage::error_response(request_id, "Missing required fields");
+                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                    serde_json::to_string(&resp).unwrap()
+                                                ));
+                                            }
+                                        }
+
+                                        "update_role_permissions" => {
+                                            if let (Some(uid), Some(guild_id), Some(data)) = (current_user_id, client_msg.guild_id, client_msg.data) {
+                                                if uid > 0 {
+                                                    // Проверяем, что пользователь - владелец гильдии
+                                                    let is_owner_result: Result<Option<bool>, _> = sqlx::query_scalar(
+                                                        "SELECT EXISTS(SELECT 1 FROM guilds WHERE id = $1 AND owner_id = $2)"
+                                                    )
+                                                    .bind(guild_id)
+                                                    .bind(uid)
+                                                    .fetch_one(db::get_db_pool())
+                                                    .await;
+                                                    
+                                                    match is_owner_result {
+                                                        Ok(is_owner_opt) => {
+                                                            let is_owner = is_owner_opt.unwrap_or(false);
+                                                            if is_owner {
+                                                                if let (Some(role_id), Some(permissions)) = (
+                                                                    data.get("role_id").and_then(|v| v.as_i64()),
+                                                                    data.get("permissions").and_then(|v| v.as_i64())
+                                                                ) {
+                                                                    // Обновляем права роли
+                                                                    let update_result = sqlx::query(
+                                                                        "UPDATE roles SET permissions = $1, updated_at = $2 WHERE id = $3 AND guild_id = $4"
+                                                                    )
+                                                                    .bind(permissions)
+                                                                    .bind(Utc::now())
+                                                                    .bind(role_id as i32)
+                                                                    .bind(guild_id)
+                                                                    .execute(db::get_db_pool())
+                                                                    .await;
+                                                                    
+                                                                    match update_result {
+                                                                        Ok(_) => {
+                                                                            // Уведомляем всех участников гильдии об изменении прав
+                                                                            let update_data = json!({
+                                                                                "guild_id": guild_id,
+                                                                                "role_id": role_id,
+                                                                                "permissions": permissions
+                                                                            });
+                                                                            
+                                                                            let broadcast_msg = WsMessage::new("role_permissions_updated", update_data)
+                                                                                .with_guild(guild_id);
+                                                                            manager.broadcast_to_guild(guild_id, broadcast_msg).await;
+                                                                            
+                                                                            let resp = WsMessage::success_response(request_id, json!({ "success": true }));
+                                                                            let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                                serde_json::to_string(&resp).unwrap()
+                                                                            ));
+                                                                        }
+                                                                        Err(e) => {
+                                                                            let resp = WsMessage::error_response(request_id, &format!("Database error: {}", e));
+                                                                            let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                                serde_json::to_string(&resp).unwrap()
+                                                                            ));
+                                                                        }
+                                                                    }
+                                                                } else {
+                                                                    let resp = WsMessage::error_response(request_id, "Missing role_id or permissions");
+                                                                    let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                        serde_json::to_string(&resp).unwrap()
+                                                                    ));
+                                                                }
+                                                            } else {
+                                                                let resp = WsMessage::error_response(request_id, "Only guild owner can manage permissions");
+                                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                    serde_json::to_string(&resp).unwrap()
+                                                                ));
+                                                            }
+                                                        }
+                                                        Err(e) => {
+                                                            let resp = WsMessage::error_response(request_id, &format!("Database error: {}", e));
+                                                            let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                serde_json::to_string(&resp).unwrap()
+                                                            ));
+                                                        }
+                                                    }
+                                                } else {
+                                                    let resp = WsMessage::error_response(request_id, "Not authenticated");
+                                                    let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                        serde_json::to_string(&resp).unwrap()
+                                                    ));
+                                                }
+                                            } else {
+                                                let resp = WsMessage::error_response(request_id, "Missing required fields");
+                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                    serde_json::to_string(&resp).unwrap()
+                                                ));
+                                            }
+                                        }
+
+                                        "update_user_permissions_direct" => {
+                                            if let (Some(uid), Some(guild_id), Some(data)) = (current_user_id, client_msg.guild_id, client_msg.data) {
+                                                if uid > 0 {
+                                                    // Проверяем, что пользователь - владелец гильдии
+                                                    let is_owner_result: Result<Option<bool>, _> = sqlx::query_scalar(
+                                                        "SELECT EXISTS(SELECT 1 FROM guilds WHERE id = $1 AND owner_id = $2)"
+                                                    )
+                                                    .bind(guild_id)
+                                                    .bind(uid)
+                                                    .fetch_one(db::get_db_pool())
+                                                    .await;
+                                                    
+                                                    match is_owner_result {
+                                                        Ok(is_owner_opt) => {
+                                                            let is_owner = is_owner_opt.unwrap_or(false);
+                                                            if is_owner {
+                                                                if let (Some(target_user_id), Some(permissions)) = (
+                                                                    data.get("user_id").and_then(|v| v.as_i64()),
+                                                                    data.get("permissions").and_then(|v| v.as_i64())
+                                                                ) {
+                                                                    // Находим или создаем роль для пользователя
+                                                                    let user_roles_result = sqlx::query_scalar::<_, i32>(
+                                                                        "SELECT r.id FROM roles r
+                                                                        INNER JOIN member_roles mr ON r.id = mr.role_id
+                                                                        WHERE mr.user_id = $1 AND mr.guild_id = $2 AND r.name != '@everyone'
+                                                                        LIMIT 1"
+                                                                    )
+                                                                    .bind(target_user_id as i32)
+                                                                    .bind(guild_id)
+                                                                    .fetch_optional(db::get_db_pool())
+                                                                    .await;
+                                                                    
+                                                                    match user_roles_result {
+                                                                        Ok(user_roles) => {
+                                                                            let role_id = if let Some(existing_role_id) = user_roles {
+                                                                                existing_role_id
+                                                                            } else {
+                                                                                // Создаем новую роль для пользователя
+                                                                                let create_result = sqlx::query_scalar::<_, i32>(
+                                                                                    "INSERT INTO roles (guild_id, name, position, permissions, created_at, updated_at)
+                                                                                    VALUES ($1, $2, 0, $3, NOW(), NOW())
+                                                                                    RETURNING id"
+                                                                                )
+                                                                                .bind(guild_id)
+                                                                                .bind(format!("role_{}", target_user_id))
+                                                                                .bind(permissions)
+                                                                                .fetch_one(db::get_db_pool())
+                                                                                .await;
+                                                                                
+                                                                                match create_result {
+                                                                                    Ok(id) => id,
+                                                                                    Err(e) => {
+                                                                                        let resp = WsMessage::error_response(request_id, &format!("Failed to create role: {}", e));
+                                                                                        let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                                            serde_json::to_string(&resp).unwrap()
+                                                                                        ));
+                                                                                        return;
+                                                                                    }
+                                                                                }
+                                                                            };
+                                                                            
+                                                                            // Обновляем права роли
+                                                                            let update_result = sqlx::query(
+                                                                                "UPDATE roles SET permissions = $1, updated_at = NOW() WHERE id = $2 AND guild_id = $3"
+                                                                            )
+                                                                            .bind(permissions)
+                                                                            .bind(role_id)
+                                                                            .bind(guild_id)
+                                                                            .execute(db::get_db_pool())
+                                                                            .await;
+                                                                            
+                                                                            match update_result {
+                                                                                Ok(_) => {
+                                                                                    // Убеждаемся, что пользователь связан с ролью
+                                                                                    let insert_result = sqlx::query(
+                                                                                        "INSERT INTO member_roles (user_id, role_id, guild_id)
+                                                                                        VALUES ($1, $2, $3)
+                                                                                        ON CONFLICT (user_id, role_id, guild_id) DO NOTHING"
+                                                                                    )
+                                                                                    .bind(target_user_id as i32)
+                                                                                    .bind(role_id)
+                                                                                    .bind(guild_id)
+                                                                                    .execute(db::get_db_pool())
+                                                                                    .await;
+                                                                                    
+                                                                                    match insert_result {
+                                                                                        Ok(_) => {
+                                                                                            // Уведомляем пользователя об изменении прав
+                                                                                            let update_data = json!({
+                                                                                                "guild_id": guild_id,
+                                                                                                "permissions": permissions,
+                                                                                                "user_id": target_user_id
+                                                                                            });
+                                                                                            
+                                                                                            let ws_message = WsMessage::new("user_permissions_updated", update_data);
+                                                                                            manager.send_to_user_by_user_id(target_user_id as i32, ws_message).await;
+                                                                                            
+                                                                                            let resp = WsMessage::success_response(request_id, json!({ "success": true }));
+                                                                                            let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                                                serde_json::to_string(&resp).unwrap()
+                                                                                            ));
+                                                                                        }
+                                                                                        Err(e) => {
+                                                                                            let resp = WsMessage::error_response(request_id, &format!("Failed to assign role: {}", e));
+                                                                                            let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                                                serde_json::to_string(&resp).unwrap()
+                                                                                            ));
+                                                                                        }
+                                                                                    }
+                                                                                }
+                                                                                Err(e) => {
+                                                                                    let resp = WsMessage::error_response(request_id, &format!("Failed to update role: {}", e));
+                                                                                    let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                                        serde_json::to_string(&resp).unwrap()
+                                                                                    ));
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                        Err(e) => {
+                                                                            let resp = WsMessage::error_response(request_id, &format!("Database error: {}", e));
+                                                                            let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                                serde_json::to_string(&resp).unwrap()
+                                                                            ));
+                                                                        }
+                                                                    }
+                                                                } else {
+                                                                    let resp = WsMessage::error_response(request_id, "Missing user_id or permissions");
+                                                                    let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                        serde_json::to_string(&resp).unwrap()
+                                                                    ));
+                                                                }
+                                                            } else {
+                                                                let resp = WsMessage::error_response(request_id, "Only guild owner can manage permissions");
+                                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                    serde_json::to_string(&resp).unwrap()
+                                                                ));
+                                                            }
+                                                        }
+                                                        Err(e) => {
+                                                            let resp = WsMessage::error_response(request_id, &format!("Database error: {}", e));
+                                                            let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                                serde_json::to_string(&resp).unwrap()
+                                                            ));
+                                                        }
+                                                    }
+                                                } else {
+                                                    let resp = WsMessage::error_response(request_id, "Not authenticated");
+                                                    let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                        serde_json::to_string(&resp).unwrap()
+                                                    ));
+                                                }
+                                            } else {
+                                                let resp = WsMessage::error_response(request_id, "Missing required fields");
+                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                                    serde_json::to_string(&resp).unwrap()
+                                                ));
+                                            }
+                                        }
+
                                         "find_guild_by_id" => {
                                             if let Some(data) = client_msg.data {
                                                 if let Some(guild_id) = data.get("guild_id").and_then(|v| v.as_i64()) {

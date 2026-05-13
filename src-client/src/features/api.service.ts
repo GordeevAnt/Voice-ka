@@ -111,6 +111,45 @@ class ApiService {
         }
     }
 
+    async updateUserRoles(userId: number, guildId: number, roleIds: number[]): Promise<boolean> {
+        try {
+            await wsService.waitForAuth();
+            const result = await wsService.request('update_user_roles', {
+                user_id: userId,
+                role_ids: roleIds
+            }, { guild_id: guildId }); // 👈 guild_id передаем в options, а не в data
+            return result.success === true;
+        } catch (err) {
+            console.error('Update user roles error:', err);
+            return false;
+        }
+    }
+
+    async updateUserPermissionsDirect(userId: number, guildId: number, permissions: number): Promise<boolean> {
+        try {
+            await wsService.waitForAuth();
+            const result = await wsService.request('update_user_permissions_direct', {
+                user_id: userId,
+                permissions: permissions
+            }, { guild_id: guildId });
+            return result.success === true;
+        } catch (err) {
+            console.error('Update user permissions error:', err);
+            return false;
+        }
+    }
+
+    async getAllGuildRoles(guildId: number): Promise<any[]> {
+        try {
+            await wsService.waitForAuth();
+            const result = await wsService.request('get_guild_roles', undefined, { guild_id: guildId });
+            return result.roles || [];
+        } catch (err) {
+            console.error('Get guild roles error:', err);
+            return [];
+        }
+    }
+
     async getUserPermissionsInGuild(userId: number, guildId: number): Promise<number> {
         try {
             await wsService.waitForAuth();

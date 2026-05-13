@@ -195,6 +195,52 @@ class WebSocketService {
             const handlers = this.eventHandlers.get(message.type)!;
             handlers.forEach(handler => handler(message.data));
         }
+
+        if (message.type === 'user_permissions_updated') {
+            // Обновляем кэш прав пользователя
+            const { guild_id, permissions, user_id } = message.data;
+            if (user_id === this.userId) {
+                // Сохраняем обновленные права в хранилище
+                await storeAPI.set(`user_permissions_${guild_id}`, permissions);
+            }
+            this.notifyEventHandlers(message.type, message.data);
+            return;
+        }
+        
+        if (message.type === 'user_roles_updated') {
+            // Очищаем кэш ролей для этой гильдии у пользователя
+            const { guild_id, user_id } = message.data;
+            if (user_id === this.userId) {
+                await storeAPI.delete(`guild_${guild_id}_user_roles`);
+            }
+            this.notifyEventHandlers(message.type, message.data);
+            return;
+        }
+
+        if (message.type === 'role_permissions_updated') {
+            // Обновляем кэш прав для всех пользователей, у которых есть эта роль
+            const { guild_id, role_id, permissions } = message.data;
+            
+            // Здесь можно обновить кэш, если нужно
+            console.log(`Role ${role_id} permissions updated to ${permissions} in guild ${guild_id}`);
+            
+            this.notifyEventHandlers(message.type, message.data);
+            return;
+        }
+    }
+
+    public notifyEventHandlers(type: string, data: any) {
+        if (this.eventHandlers.has(type)) {
+            const handlers = this.eventHandlers.get(type)!;
+            handlers.forEach(handler => handler(data));
+        }
+    }
+
+    public triggerEvent(type: string, data: any) {
+        if (this.eventHandlers.has(type)) {
+            const handlers = this.eventHandlers.get(type)!;
+            handlers.forEach(handler => handler(data));
+        }
     }
 
     async request(type: string, data?: any, options?: { room_id?: number; guild_id?: number }): Promise<any> {

@@ -6,6 +6,7 @@ import { storeAPI } from "../features/useStore";
 import { wsService } from "../features/websocket.service";
 import { useUserPermissions } from "../features/useUserPermissions";
 import "./Info_Pages.css";
+import { UserPermissionsModal } from "../features/UserPermissionsModal";
 
 interface Guild {
     id: number;
@@ -35,6 +36,8 @@ export function Chanel_Info_Page() {
         name: "",
         description: ""
     });
+    const [selectedMember, setSelectedMember] = useState<{ id: number; username: string } | null>(null);
+    const [isPermissionsModalOpen, setIsPermissionsModalOpen] = useState(false);
     
     const { hasEditGuild, isLoading: permissionsLoading } = useUserPermissions(guildId);
     const guildIdRef = useRef(guildId);
@@ -76,6 +79,14 @@ export function Chanel_Info_Page() {
         console.log('➖ Removing member from list:', userId);
         setMembers(prev => prev.filter(m => m.user_id !== userId));
     }, []);
+
+    const handlePermissionsUpdated = async () => {
+        console.log('🔄 Permissions updated, refreshing member roles...');
+        // Обновляем список участников (чтобы обновить их роли в кэше)
+        await refreshMembers();
+        
+        // Уведомляем через WebSocket о смене прав (сервер сам отправит уведомление)
+    };
 
     useEffect(() => {
         guildIdRef.current = guildId;
@@ -161,6 +172,34 @@ export function Chanel_Info_Page() {
                 });
             }
         });
+
+        const unsubscribeRolePermissionsUpdated = wsService.on('role_permissions_updated', async (data) => {
+            console.log('🔄 Role permissions updated via WS:', data);
+            const { guild_id, role_id, permissions } = data;
+            
+            if (guild_id === guildIdRef.current) {
+                // Обновляем права текущего пользователя, если он имеет эту роль
+                const currentUserId = wsService.getCurrentUserId();
+                if (currentUserId) {
+                    const userRoles = await apiService.getUserRolesInGuild(currentUserId, guild_id);
+                    const hasRole = userRoles.some(r => r.id === role_id);
+                    
+                    if (hasRole) {
+                        // Обновляем права текущего пользователя
+                        const newPermissions = await apiService.getUserPermissionsInGuild(currentUserId, guild_id);
+                        // Уведомляем через событие, чтобы useUserPermissions обновился
+                        wsService.notifyEventHandlers('user_permissions_updated', {
+                            guild_id: guild_id,
+                            user_id: currentUserId,
+                            permissions: newPermissions
+                        });
+                    }
+                }
+                
+                // Обновляем список участников, чтобы отобразить изменения
+                await refreshMembers();
+            }
+        });
         
         return () => {
             unsubscribeGuildUpdated();
@@ -168,8 +207,31 @@ export function Chanel_Info_Page() {
             unsubscribeUserJoinedGuild();
             unsubscribeUserLeftGuild();
             unsubscribeGuildLeft();
+            unsubscribeRolePermissionsUpdated();
         };
     }, [navigate, addMember, removeMember]);
+
+    // Для обновления прав целевого пользователя
+    useEffect(() => {
+        const unsubscribePermissionsUpdated = wsService.on('user_permissions_updated', async (data) => {
+            console.log('🔄 User permissions updated via WS:', data);
+            const { guild_id, user_id, permissions } = data;
+            
+            if (guild_id === guildIdRef.current) {
+                // Если это текущая гильдия
+                if (user_id === wsService.getCurrentUserId()) {
+                    // Обновляем права текущего пользователя
+                    // useUserPermissions сам обновится через свой хук
+                    console.log('Current user permissions updated');
+                }
+                
+                // Обновляем список участников, чтобы отобразить изменения
+                await refreshMembers();
+            }
+        });
+        
+        return () => unsubscribePermissionsUpdated();
+    }, [refreshMembers]);
 
     // Подписка на гильдию
     useEffect(() => {
@@ -364,9 +426,37 @@ export function Chanel_Info_Page() {
                                         <div className="member-joined">
                                             Присоединился: {new Date(member.joined_at).toLocaleDateString()}
                                         </div>
+
+                                        {guild.owner_id === wsService.getCurrentUserId() && 
+                                        member.user_id !== wsService.getCurrentUserId() && (
+                                            <button 
+                                                className="manage-permissions-btn"
+                                                onClick={() => {
+                                                    setSelectedMember({
+                                                        id: member.user_id,
+                                                        username: member.username
+                                                    });
+                                                    setIsPermissionsModalOpen(true);
+                                                }}
+                                                title="Управление правами"
+                                            >
+                                                ⚙️
+                                            </button>
+                                        )}  
                                     </div>
                                 ))}
                             </div>
+                            <UserPermissionsModal
+                                isOpen={isPermissionsModalOpen}
+                                onClose={() => {
+                                    setIsPermissionsModalOpen(false);
+                                    setSelectedMember(null);
+                                }}
+                                userId={selectedMember?.id || 0}
+                                username={selectedMember?.username || ''}
+                                guildId={guild.id}
+                                onPermissionsUpdated={handlePermissionsUpdated}
+                            />
                         </div>
                     </>
                 ) : (

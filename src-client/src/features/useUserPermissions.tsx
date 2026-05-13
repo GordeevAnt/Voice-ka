@@ -2,12 +2,15 @@
 import { useEffect, useState } from 'react';
 import { storeAPI } from './useStore';
 import { apiService } from './api.service';
+import { wsService } from './websocket.service';
 
 export enum Permission {
     EDIT_GUILD = 1 << 1,        // 2 - Редактировать канал
     CREATE_ROOMS = 1 << 2,      // 4 - Создавать комнаты в канале
     EDIT_ROOMS = 1 << 3,        // 8 - Редактировать комнаты канала
-    SEND_MESSAGES = 1 << 4,     // 16 - Писать сообщения в комнате
+    BAN_MEMBERS = 1 << 4,       // 16 - Блокировать участников
+    KICK_MEMBERS = 1 << 5,      // 32 - Кикать участников
+    SEND_MESSAGES = 1 << 6,     // 64 - Писать сообщения в комнате
 }
 
 export function useUserPermissions(guildId: number | null, roomId?: number) {
@@ -47,6 +50,27 @@ export function useUserPermissions(guildId: number | null, roomId?: number) {
         };
 
         loadPermissions();
+    }, [guildId]);
+
+    useEffect(() => {
+        if (!guildId) return;
+        
+        const unsubscribe = wsService.on('user_permissions_updated', (data) => {
+            if (data.guild_id === guildId && data.user_id === wsService.getCurrentUserId()) {
+                // Обновляем права текущего пользователя
+                const newPermissions = data.permissions;
+                setPermissions(newPermissions);
+                setHasEditGuild((newPermissions & Permission.EDIT_GUILD) !== 0);
+                setHasCreateRooms((newPermissions & Permission.CREATE_ROOMS) !== 0);
+                setHasEditRooms((newPermissions & Permission.EDIT_ROOMS) !== 0);
+                setHasSendMessages((newPermissions & Permission.SEND_MESSAGES) !== 0);
+                
+                // Обновляем кэш
+                storeAPI.set(`user_permissions_${guildId}`, newPermissions);
+            }
+        });
+        
+        return () => unsubscribe();
     }, [guildId]);
 
     const checkPermission = (permission: Permission): boolean => {

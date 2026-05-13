@@ -155,6 +155,22 @@
     background: #2a2a30;
 }
 
+.manage-permissions-btn {
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+    opacity: 0.6;
+}
+
+.manage-permissions-btn:hover {
+    background-color: #404249;
+    opacity: 1;
+}
+
 .avatar-placeholder {
     width: 100%;
     height: 100%;
