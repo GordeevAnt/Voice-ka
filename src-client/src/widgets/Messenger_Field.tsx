@@ -1,6 +1,6 @@
 // widgets/Messenger_Field.tsx
 import { Messages_List } from "./Messages_List";
-import { Message_Input } from "./Message_Input";
+import { Message_Input } from "../entities/Message_Input";
 import { wsService } from "../features/websocket.service";
 import { useEffect, useState } from "react";
 import { useUserPermissions } from "../features/useUserPermissions";
