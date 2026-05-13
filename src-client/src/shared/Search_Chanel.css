@@ -85,6 +85,7 @@
 }
 
 .search-button {
+    height: 38px;
     padding: 10px 24px;
     background: #5865f2;
     border: none;
