@@ -326,11 +326,14 @@ export function Chanel_Info_Page() {
                             
                             <div className="chanel-details">
                                 <h2>{guild.name}</h2>
+                                <p className="chanel-id">
+                                    {`ID: ${guild.id}` || ""}
+                                </p>
                                 <p className="chanel-description">
                                     {guild.description || "Нет описания"}
                                 </p>
                                 <div className="chanel-stats">
-                                    <span>👥 {members.length} участников</span>
+                                    <span>👥 {members.length}</span>
                                     <span>👑 Владелец: {members.find(m => m.user_id === guild.owner_id)?.username || "Неизвестен"}</span>
                                 </div>
                             </div>

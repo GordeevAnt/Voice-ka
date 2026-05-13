@@ -129,6 +129,12 @@ class ApiService {
         try {
             await wsService.waitForAuth();
             const result = await wsService.request('create_guild', guildData);
+            
+            // 👇 После создания, подписываемся на гильдию и обновляем права
+            if (result.guild && result.guild.id) {
+                wsService.subscribeGuild(result.guild.id);
+            }
+            
             return result.guild;
         } catch (err) {
             console.error('Create guild error:', err);

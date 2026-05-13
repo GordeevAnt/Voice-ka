@@ -86,7 +86,7 @@ pub async fn get_user_guilds_ids(user_id: i32) -> Result<Vec<i32>, String> {
 pub async fn handle_create_guild(
     user_id: i32,
     data: CreateGuildData,
-    _manager: Arc<SubscriptionManager>,
+    manager: Arc<SubscriptionManager>,
 ) -> Result<serde_json::Value, String> {
     let pool = get_db_pool();
 
@@ -94,7 +94,6 @@ pub async fn handle_create_guild(
         .await
         .map_err(|e| e.to_string())?;
 
-    // ✅ ИСПРАВЛЕНО: используем query вместо query! для Option типов
     let now = Utc::now();
     
     let guild_row = sqlx::query(
@@ -131,13 +130,28 @@ pub async fn handle_create_guild(
     .map_err(|e| e.to_string())?;
 
     // Создаем роль Admin
-    sqlx::query(
+    let admin_role = sqlx::query(
         "INSERT INTO roles (guild_id, name, position, permissions, created_at, updated_at)
-            VALUES ($1, 'Admin', 0, -1, $2, $2)"
+            VALUES ($1, 'Admin', 0, -1, $2, $2)
+            RETURNING id"
     )
     .bind(guild_id)
     .bind(now)
     .bind(now)
+    .fetch_one(&mut *transaction)
+    .await
+    .map_err(|e| e.to_string())?;
+    
+    let admin_role_id: i32 = admin_role.get(0);
+
+    // 👇 ИСПРАВЛЕНО: убраны created_at и updated_at (их нет в таблице member_roles)
+    sqlx::query(
+        "INSERT INTO member_roles (user_id, guild_id, role_id)
+            VALUES ($1, $2, $3)"
+    )
+    .bind(user_id)
+    .bind(guild_id)
+    .bind(admin_role_id)
     .execute(&mut *transaction)
     .await
     .map_err(|e| e.to_string())?;
@@ -191,8 +205,8 @@ pub async fn handle_create_guild(
     });
 
     // Уведомляем пользователя о создании гильдии
-    // let ws_message = WsMessage::new("guild_created", result.clone());
-    // manager.send_to_user_by_user_id(user_id, ws_message).await;
+    let ws_message = WsMessage::new("guild_created", result.clone());
+    manager.send_to_user_by_user_id(user_id, ws_message).await;
 
     Ok(result)
 }

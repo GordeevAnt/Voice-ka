@@ -60,7 +60,6 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
         const container = scrollContainerRef.current;
         if (!container) return;
 
-        // Проверяем, нужно ли показывать скролл
         const checkScroll = () => {
             const hasScroll = container.scrollWidth > container.clientWidth;
             console.log('Has horizontal scroll:', hasScroll, 
@@ -72,7 +71,7 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
         window.addEventListener('resize', checkScroll);
         
         return () => window.removeEventListener('resize', checkScroll);
-    }, [guilds]); // Зависит от guilds, так как они влияют на ширину
+    }, [guilds]);
 
     useEffect(() => {
         fetchGuilds();
@@ -84,6 +83,15 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
                 if (exists) return prev;
                 return [...prev, guild];
             });
+            
+            // Автоматически переключаемся на созданную гильдию
+            if (guild && guild.id) {
+                console.log(`🆕 Auto-switching to new guild: ${guild.id}`);
+                // Небольшая задержка, чтобы список обновился
+                setTimeout(() => {
+                    onGuildSelect(guild.id);
+                }, 100);
+            }
         });
         
         const unsubscribeGuildUpdated = wsService.on('guild_updated', (updatedGuild) => {
@@ -93,7 +101,6 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
             ));
         });
         
-        // Подписка на обновление профиля для владельца канала
         const unsubscribeProfileUpdated = wsService.on('user_profile_updated', (userData) => {
             setGuilds(prev => prev.map(g =>
                 g.owner_id === userData.user_id
@@ -139,13 +146,17 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
                 icon: null
             });
 
+            // Обновляем список гильдий
             await fetchGuilds();
+            
             setShowCreateModal(false);
             setNewGuildName("");
             setNewGuildDescription("");
             
             if (newGuild && newGuild.id) {
                 console.log(`🆕 New guild created, switching to: ${newGuild.id}`);
+                // Подписываемся на гильдию для получения обновлений
+                wsService.subscribeGuild(newGuild.id);
                 onGuildSelect(newGuild.id);
             }
         } catch (err) {
@@ -158,9 +169,11 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
 
     if (loading) {
         return (
-            <footer className="chanels-container">
-                <div className="loading">Загрузка каналов...</div>
-            </footer>
+            <>
+                <footer className="chanels-container">
+                    <div className="loading">Загрузка каналов...</div>
+                </footer>
+            </>
         );
     }
 

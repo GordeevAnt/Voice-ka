@@ -99,8 +99,13 @@
 }
 
 .chanel-details h2 {
-    margin: 0 0 12px 0;
+    margin: 0 0 2px 0;
     font-size: 28px;
+}
+
+.chanel-id {
+    color: #a0a0b0;
+    margin-top: 0;
 }
 
 .chanel-description {
