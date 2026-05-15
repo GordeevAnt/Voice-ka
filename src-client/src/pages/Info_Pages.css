@@ -282,6 +282,11 @@
     margin-top: 24px;
 }
 
+.header-buttons {
+    display: flex;
+    gap: 10px;
+}
+
 .save-btn, .edit-btn, .delete-btn, .cancel-btn {
     padding: 10px 24px;
     border: none;
@@ -421,7 +426,7 @@
     background-color: #dc3545;
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: 8px;
     cursor: pointer;
     font-size: 14px;
 }

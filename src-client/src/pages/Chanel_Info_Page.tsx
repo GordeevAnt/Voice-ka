@@ -366,7 +366,7 @@ export function Chanel_Info_Page() {
                     )}
                     {!isEditing && guild.owner_id !== wsService.getCurrentUserId() && (
                         <button className="leave-btn" onClick={handleLeaveGuild}>
-                            Покинуть гильдию
+                            Покинуть
                         </button>
                     )}
                 </div>
