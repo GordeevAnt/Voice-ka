@@ -76,7 +76,7 @@ export function Personal_Account_Info_Page() {
                 if (userData) {
                     setUser(userData);
                     
-                    await storeAPI.set('user_id', userData.id.toString());
+                    await storeAPI.set('user_id', userData.id);
                     setUserId(userData.id);
                     await storeAPI.set('username', userData.username);
                     

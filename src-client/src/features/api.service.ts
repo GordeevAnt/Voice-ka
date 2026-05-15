@@ -152,6 +152,11 @@ class ApiService {
 
     async getUserPermissionsInGuild(userId: number, guildId: number): Promise<number> {
         try {
+            console.log('📤 getUserPermissionsInGuild called with:', { userId, guildId, userIdType: typeof userId, guildIdType: typeof guildId });
+            if (!userId || !guildId) {
+                console.error('❌ Missing userId or guildId!', { userId, guildId });
+                return 0;
+            }
             await wsService.waitForAuth();
             const result = await wsService.request('get_user_permissions_in_guild', { 
                 user_id: userId, 

@@ -24,14 +24,19 @@ export function useUserPermissions(guildId: number | null, roomId?: number) {
 
     // Функция загрузки прав
     const loadPermissions = async (ignoreCache = false) => {
+        console.log('🔍 loadPermissions called with guildId:', guildId);
+        
         if (!guildId) {
+            console.log('⚠️ No guildId, skipping');
             setIsLoading(false);
             return;
         }
 
         try {
             const userId = await storeAPI.get<number>('user_id');
+            console.log('🔍 Retrieved userId from store:', userId, 'type:', typeof userId);
             if (!userId) {
+                console.log('⚠️ No userId, skipping');
                 setIsLoading(false);
                 return;
             }
@@ -43,6 +48,7 @@ export function useUserPermissions(guildId: number | null, roomId?: number) {
                 await storeAPI.delete(cacheKey);
             }
             
+            console.log('✅ Both IDs present, sending request...');
             const perms = await apiService.getUserPermissionsInGuild(userId, guildId);
             setPermissions(perms);
             
@@ -59,24 +65,6 @@ export function useUserPermissions(guildId: number | null, roomId?: number) {
 
     useEffect(() => {
         loadPermissions();
-    }, [guildId]);
-
-    // Слушаем обновление профиля - просто перезагружаем права из БД (они не изменились, но кэш мог быть испорчен)
-    useEffect(() => {
-        if (!guildId) return;
-        
-        const unsubscribeProfileUpdated = wsService.on('user_profile_updated', (data) => {
-            if (data.user_id === wsService.getCurrentUserId()) {
-                console.log('📝 User profile updated, reloading permissions (cache refresh only)');
-                // Просто перезагружаем права, игнорируя кэш
-                // Права не изменились, но кэш мог быть поврежден
-                loadPermissions(true);
-            }
-        });
-        
-        return () => {
-            unsubscribeProfileUpdated();
-        };
     }, [guildId]);
 
     // Слушаем реальное обновление прав (когда меняются роли)
