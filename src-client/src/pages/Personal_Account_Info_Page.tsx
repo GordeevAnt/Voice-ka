@@ -172,6 +172,13 @@ export function Personal_Account_Info_Page() {
                 // Перезагружаем данные
                 await loadUserInfo();
                 await loadUserStats();
+
+                wsService.notify('user_profile_updated', {
+                    user_id: userId,
+                    username: editData.username,
+                    avatar: user?.avatar,
+                    status: user?.status
+                });
             } else {
                 alert("Ошибка обновления профиля");
             }

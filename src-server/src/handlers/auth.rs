@@ -255,10 +255,12 @@ pub async fn handle_register(data: RegisterData) -> Result<(bool, i32), String> 
     .await
     .map_err(|e| e.to_string())?;
 
-    // Создаем роль @everyone
-    let role_id: i32 = sqlx::query_scalar!(
-        "INSERT INTO roles (guild_id, name, position, created_at, updated_at)
-         VALUES ($1, '@everyone', 0, $2, $2)
+    // 👇 СОЗДАЕМ РОЛИ С ПРАВИЛЬНЫМИ ПРАВАМИ
+
+    // 1. Создаем роль Admin с ВСЕМИ правами (126 = все права)
+    let admin_role_id: i32 = sqlx::query_scalar!(
+        "INSERT INTO roles (guild_id, name, position, permissions, created_at, updated_at)
+         VALUES ($1, 'Admin', 100, 126, $2, $2)
          RETURNING id",
         guild_id,
         Utc::now()
@@ -267,19 +269,43 @@ pub async fn handle_register(data: RegisterData) -> Result<(bool, i32), String> 
     .await
     .map_err(|e| e.to_string())?;
 
-    // Назначаем роль
+    // 2. Создаем роль @everyone с правом отправки сообщений (64)
+    let everyone_role_id: i32 = sqlx::query_scalar!(
+        "INSERT INTO roles (guild_id, name, position, permissions, created_at, updated_at)
+         VALUES ($1, '@everyone', 0, 64, $2, $2)
+         RETURNING id",
+        guild_id,
+        Utc::now()
+    )
+    .fetch_one(&mut *transaction)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    // 3. Назначаем владельцу роль Admin (ВСЕ права)
     sqlx::query!(
         "INSERT INTO member_roles (user_id, role_id, guild_id)
          VALUES ($1, $2, $3)",
         user_id,
-        role_id,
+        admin_role_id,
         guild_id
     )
     .execute(&mut *transaction)
     .await
     .map_err(|e| e.to_string())?;
 
-    // Создаем текстовую комнату
+    // 4. Также назначаем владельцу роль @everyone (для базовых прав)
+    sqlx::query!(
+        "INSERT INTO member_roles (user_id, role_id, guild_id)
+         VALUES ($1, $2, $3)",
+        user_id,
+        everyone_role_id,
+        guild_id
+    )
+    .execute(&mut *transaction)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    // 5. Создаем текстовую комнату
     sqlx::query!(
         "INSERT INTO rooms (name, type, guild_id, position, created_at, updated_at)
          VALUES ('general', 'text', $1, 0, $2, $2)",
@@ -290,7 +316,7 @@ pub async fn handle_register(data: RegisterData) -> Result<(bool, i32), String> 
     .await
     .map_err(|e| e.to_string())?;
 
-    // Создаем голосовую комнату
+    // 6. Создаем голосовую комнату
     sqlx::query!(
         "INSERT INTO rooms (name, type, guild_id, position, bitrate, created_at, updated_at)
          VALUES ('General Voice', 'voice', $1, 1, 64000, $2, $2)",
@@ -307,7 +333,6 @@ pub async fn handle_register(data: RegisterData) -> Result<(bool, i32), String> 
         "email": data.email
     });
 
-    // 🔧 ИСПРАВЛЕНО: используем query вместо query! для динамических значений
     let audit_str = audit_data.to_string();
 
     sqlx::query(
@@ -328,6 +353,9 @@ pub async fn handle_register(data: RegisterData) -> Result<(bool, i32), String> 
         .map_err(|e| e.to_string())?;
 
     println!("✅ User {} (ID: {}) registered with guild {}", data.login, user_id, guild_id);
+    println!("   - Admin role created with all permissions (126)");
+    println!("   - @everyone role created with SEND_MESSAGES permission (64)");
+    println!("   - User assigned both Admin and @everyone roles");
 
     Ok((true, user_id))
 }

@@ -1,4 +1,5 @@
 // src/features/useUserPermissions.ts
+
 import { useEffect, useState } from 'react';
 import { storeAPI } from './useStore';
 import { apiService } from './api.service';
@@ -21,52 +22,76 @@ export function useUserPermissions(guildId: number | null, roomId?: number) {
     const [hasEditRooms, setHasEditRooms] = useState(false);
     const [hasSendMessages, setHasSendMessages] = useState(false);
 
-    useEffect(() => {
-        const loadPermissions = async () => {
-            if (!guildId) {
+    // Функция загрузки прав
+    const loadPermissions = async (ignoreCache = false) => {
+        if (!guildId) {
+            setIsLoading(false);
+            return;
+        }
+
+        try {
+            const userId = await storeAPI.get<number>('user_id');
+            if (!userId) {
                 setIsLoading(false);
                 return;
             }
 
-            try {
-                const userId = await storeAPI.get<number>('user_id');
-                if (!userId) {
-                    setIsLoading(false);
-                    return;
-                }
-
-                const perms = await apiService.getUserPermissionsInGuild(userId, guildId);
-                setPermissions(perms);
-                
-                setHasEditGuild((perms & Permission.EDIT_GUILD) !== 0);
-                setHasCreateRooms((perms & Permission.CREATE_ROOMS) !== 0);
-                setHasEditRooms((perms & Permission.EDIT_ROOMS) !== 0);
-                setHasSendMessages((perms & Permission.SEND_MESSAGES) !== 0);
-            } catch (error) {
-                console.error('Error loading permissions:', error);
-            } finally {
-                setIsLoading(false);
+            const cacheKey = `user_permissions_${guildId}_${userId}`;
+            
+            // Если нужно игнорировать кэш, удаляем его
+            if (ignoreCache) {
+                await storeAPI.delete(cacheKey);
             }
-        };
+            
+            const perms = await apiService.getUserPermissionsInGuild(userId, guildId);
+            setPermissions(perms);
+            
+            setHasEditGuild((perms & Permission.EDIT_GUILD) !== 0);
+            setHasCreateRooms((perms & Permission.CREATE_ROOMS) !== 0);
+            setHasEditRooms((perms & Permission.EDIT_ROOMS) !== 0);
+            setHasSendMessages((perms & Permission.SEND_MESSAGES) !== 0);
+        } catch (error) {
+            console.error('Error loading permissions:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
+    useEffect(() => {
         loadPermissions();
     }, [guildId]);
 
+    // Слушаем обновление профиля - просто перезагружаем права из БД (они не изменились, но кэш мог быть испорчен)
+    useEffect(() => {
+        if (!guildId) return;
+        
+        const unsubscribeProfileUpdated = wsService.on('user_profile_updated', (data) => {
+            if (data.user_id === wsService.getCurrentUserId()) {
+                console.log('📝 User profile updated, reloading permissions (cache refresh only)');
+                // Просто перезагружаем права, игнорируя кэш
+                // Права не изменились, но кэш мог быть поврежден
+                loadPermissions(true);
+            }
+        });
+        
+        return () => {
+            unsubscribeProfileUpdated();
+        };
+    }, [guildId]);
+
+    // Слушаем реальное обновление прав (когда меняются роли)
     useEffect(() => {
         if (!guildId) return;
         
         const unsubscribe = wsService.on('user_permissions_updated', (data) => {
             if (data.guild_id === guildId && data.user_id === wsService.getCurrentUserId()) {
-                // Обновляем права текущего пользователя
+                console.log('🔄 Real permissions update received');
                 const newPermissions = data.permissions;
                 setPermissions(newPermissions);
                 setHasEditGuild((newPermissions & Permission.EDIT_GUILD) !== 0);
                 setHasCreateRooms((newPermissions & Permission.CREATE_ROOMS) !== 0);
                 setHasEditRooms((newPermissions & Permission.EDIT_ROOMS) !== 0);
                 setHasSendMessages((newPermissions & Permission.SEND_MESSAGES) !== 0);
-                
-                // Обновляем кэш
-                storeAPI.set(`user_permissions_${guildId}`, newPermissions);
             }
         });
         
