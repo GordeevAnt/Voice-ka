@@ -129,10 +129,11 @@ pub async fn handle_create_guild(
     .await
     .map_err(|e| e.to_string())?;
 
-    // Создаем роль Admin
+    // Создаем роль Admin с ВСЕМИ правами
+    // Все права: EDIT_GUILD(2) | CREATE_ROOMS(4) | EDIT_ROOMS(8) | BAN_MEMBERS(16) | KICK_MEMBERS(32) | SEND_MESSAGES(64) = 126
     let admin_role = sqlx::query(
         "INSERT INTO roles (guild_id, name, position, permissions, created_at, updated_at)
-            VALUES ($1, 'Admin', 0, -1, $2, $2)
+            VALUES ($1, 'Admin', 0, 126, $2, $2)
             RETURNING id"
     )
     .bind(guild_id)
@@ -144,7 +145,7 @@ pub async fn handle_create_guild(
     
     let admin_role_id: i32 = admin_role.get(0);
 
-    // 👇 ИСПРАВЛЕНО: убраны created_at и updated_at (их нет в таблице member_roles)
+    // Назначаем владельцу роль Admin
     sqlx::query(
         "INSERT INTO member_roles (user_id, guild_id, role_id)
             VALUES ($1, $2, $3)"
@@ -156,10 +157,10 @@ pub async fn handle_create_guild(
     .await
     .map_err(|e| e.to_string())?;
 
-    // Создаем роль @everyone
+    // Создаем роль @everyone с базовыми правами (только отправка сообщений)
     sqlx::query(
         "INSERT INTO roles (guild_id, name, position, permissions, created_at, updated_at)
-            VALUES ($1, '@everyone', 1, 0, $2, $2)"
+            VALUES ($1, '@everyone', 1, 64, $2, $2)"
     )
     .bind(guild_id)
     .bind(now)
@@ -249,6 +250,10 @@ pub async fn handle_join_guild(
         return Err("Already a member".to_string());
     }
 
+    let mut transaction = pool.begin()
+        .await
+        .map_err(|e| e.to_string())?;
+
     // Добавляем в гильдию
     sqlx::query(
         "INSERT INTO guild_members (user_id, guild_id, joined_at)
@@ -257,11 +262,54 @@ pub async fn handle_join_guild(
     .bind(user_id)
     .bind(guild_id)
     .bind(Utc::now())
-    .execute(pool)
+    .execute(&mut *transaction)
     .await
     .map_err(|e| e.to_string())?;
 
-    // Получаем информацию о пользователе
+    // Находим или создаем роль @everyone для этой гильдии
+    let everyone_role_id: Option<i32> = sqlx::query_scalar(
+        "SELECT id FROM roles WHERE guild_id = $1 AND name = '@everyone'"
+    )
+    .bind(guild_id)
+    .fetch_optional(&mut *transaction)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let everyone_role_id = if let Some(role_id) = everyone_role_id {
+        role_id
+    } else {
+        // Если роли @everyone нет, создаем её
+        sqlx::query_scalar(
+            "INSERT INTO roles (guild_id, name, position, permissions, created_at, updated_at)
+             VALUES ($1, '@everyone', 0, 64, $2, $2)
+             RETURNING id"
+        )
+        .bind(guild_id)
+        .bind(Utc::now())
+        .bind(Utc::now())
+        .fetch_one(&mut *transaction)
+        .await
+        .map_err(|e| e.to_string())?
+    };
+
+    // Назначаем роль @everyone новому участнику (только отправка сообщений - право 64)
+    sqlx::query(
+        "INSERT INTO member_roles (user_id, role_id, guild_id)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (user_id, role_id, guild_id) DO NOTHING"
+    )
+    .bind(user_id)
+    .bind(everyone_role_id)
+    .bind(guild_id)
+    .execute(&mut *transaction)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    transaction.commit()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Получаем информацию о пользователе для уведомления
     let user_row = sqlx::query(
         "SELECT username, avatar, status FROM users WHERE id = $1"
     )
@@ -272,14 +320,20 @@ pub async fn handle_join_guild(
     
     let username: String = user_row.get(0);
     let avatar: Option<String> = user_row.get(1);
-    let status: String = user_row.get(2);
+    let db_status: String = user_row.get(2);
 
-    // Уведомляем всех в гильдии о присоединении
+    // Проверяем, онлайн ли пользователь через менеджер соединений
+    let is_online = manager.get_user_id(&user_id.to_string()).await.is_some();
+    let actual_status = if is_online { "online" } else { db_status.as_str() };
+
+    println!("📡 User {} joined guild {}. Is online: {}, status: {}", username, guild_id, is_online, actual_status);
+
+    // 1. Уведомляем всех в гильдии о присоединении (для обновления списка участников)
     let user_joined_data = json!({
         "user_id": user_id,
         "username": username,
         "avatar": avatar,
-        "status": status,
+        "status": actual_status,
         "guild_id": guild_id,
     });
 
@@ -287,16 +341,20 @@ pub async fn handle_join_guild(
         .with_guild(guild_id);
     manager.broadcast_to_guild(guild_id, ws_joined_msg).await;
 
-    // Также уведомляем об изменении статуса (если пользователь онлайн)
-    if status == "online" {
-        handle_notify_user_status_change(
-            &manager,
-            user_id,
-            &username,
-            &avatar,
-            &status,
-            &[guild_id],
-        ).await;
+    // 2. Если пользователь онлайн, отправляем отдельное событие user_online
+    if is_online {
+        let online_data = json!({
+            "user_id": user_id,
+            "username": username,
+            "avatar": avatar,
+            "status": "online"
+        });
+        
+        let ws_online_msg = WsMessage::new("user_online", online_data)
+            .with_guild(guild_id);
+        manager.broadcast_to_guild(guild_id, ws_online_msg).await;
+        
+        println!("📡 Sent user_online event for user {} in guild {}", username, guild_id);
     }
 
     Ok(true)
