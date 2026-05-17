@@ -17,23 +17,27 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: 'html',
-  /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
-  use: {
-    /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: 'http://localhost:1420',
-
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: 'on-first-retry',
-    
-    /* Screenshot on failure */
-    screenshot: 'only-on-failure',
-  },
 
   /* Configure projects for major browsers */
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      testDir: './tests',
+      testIgnore: ['**/tests/server/**', '**/tests/tauri/**', '**/src-server/**'],
+      use: {
+        ...devices['Desktop Chrome'],
+        /* Base URL to use in actions like `await page.goto('/')`. */
+        baseURL: 'http://localhost:1420',
+      },
+    },
+    // Server tests project (WebSocket tests)
+    {
+      name: 'server',
+      testDir: '../src-server/tests',
+      use: {
+        /* No browser needed for WebSocket tests */
+        baseURL: undefined,
+      },
     },
     // Uncomment for cross-browser testing
     // {
@@ -45,6 +49,15 @@ export default defineConfig({
     //   use: { ...devices['Desktop Safari'] },
     // },
   ],
+
+  /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
+  use: {
+    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
+    trace: 'on-first-retry',
+    
+    /* Screenshot on failure */
+    screenshot: 'only-on-failure',
+  },
 
   /* Run your local dev server before starting the tests */
   // webServer: {

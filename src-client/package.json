@@ -13,7 +13,9 @@
     "test:ui": "playwright test --ui",
     "test:debug": "playwright test --debug",
     "test:chromium": "playwright test --project=chromium",
-    "test:report": "playwright test --reporter=html"
+    "test:report": "playwright test --reporter=html",
+    "test:server": "cd ../src-server && npm run test",
+    "test:all": "npm run test && npm run test:server"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

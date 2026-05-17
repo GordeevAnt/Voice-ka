@@ -1,4 +1,4 @@
-е# Тестирование React компонентов Voice-ka
+# Тестирование React компонентов Voice-ka
 
 ## Обзор
 
@@ -12,6 +12,8 @@
 - **Widget компоненты** (`Header.tsx`, `Chanels_List.tsx`, `Rooms_List.tsx`, `Rooms_Online_List.tsx`, `Messenger_Field.tsx`)
 - **Интеграционные тесты** для ключевых пользовательских сценариев
 
+**Примечание**: Тесты для WebSocket сервера были перенесены в папку `src-server/tests/` и имеют отдельную конфигурацию Playwright.
+
 ## Структура тестов
 
 ```
@@ -23,8 +25,7 @@ tests/
 ├── shared/                # Тесты для Shared компонентов
 ├── widgets/               # Тесты для Widget компонентов
 ├── integration/           # Интеграционные тесты пользовательских сценариев
-├── utils/                 # Вспомогательные утилиты и mock-данные
-└── server/                # Тесты для WebSocket сервера (будут перенесены в src-server)
+└── utils/                 # Вспомогательные утилиты и mock-данные
 ```
 
 ## Установка и настройка
@@ -80,13 +81,43 @@ cd src-client
 npx playwright test tests/app/app.spec.ts
 ```
 
+### Тесты для WebSocket сервера
+
+Тесты для WebSocket сервера были перенесены в папку `src-server/tests/` и имеют отдельную конфигурацию Playwright. Для их запуска:
+
+```bash
+# Из корневой директории проекта
+cd src-client
+npm run test:server
+
+# Или напрямую из папки src-server
+cd src-server
+npm test
+```
+
+**Важно**: Перед запуском серверных тестов убедитесь, что Rust сервер запущен:
+```bash
+cd src-server
+cargo run server
+```
+
 ## Конфигурация
 
-Конфигурация Playwright находится в `playwright.config.ts`:
+### React компоненты
+Конфигурация Playwright для React компонентов находится в `src-client/playwright.config.ts`:
 
 - **baseURL**: `http://localhost:1420` (Tauri dev-сервер)
-- **Projects**: Chromium, Firefox, WebKit
-- **WebServer**: Автоматический запуск Tauri dev-сервера на порту 1420
+- **Projects**: Chromium (по умолчанию), Firefox, WebKit (закомментированы)
+- **testIgnore**: Игнорируются тесты из папок `server/` и `tauri/`
+- **WebServer**: Автоматический запуск Tauri dev-сервера на порту 1420 (закомментирован)
+
+### WebSocket сервер
+Конфигурация для тестов WebSocket сервера находится в `src-server/playwright.config.ts`:
+
+- **testDir**: `./tests` (относительно src-server)
+- **baseURL**: Не используется (тесты подключаются напрямую к WebSocket на порту 9001)
+- **Projects**: `server` (без браузера)
+- **WebServer**: Не используется (сервер должен быть запущен вручную)
 
 ## Особенности тестирования Tauri приложения
 
