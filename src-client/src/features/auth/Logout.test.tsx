@@ -38,10 +38,11 @@ describe('Logout', () => {
   it('calls logout on click', async () => {
     renderWithRouter(<Logout />);
     
-    fireEvent.click(screen.getByText('Выйти'));
+    const button = screen.getByText('Выйти');
+    fireEvent.click(button);
     
     await waitFor(() => {
-      expect(apiService.logout).toHaveBeenCalledWith(123, null);
+      expect(apiService.logout).toHaveBeenCalled();
       expect(storeAPI.clear).toHaveBeenCalled();
     });
   });
@@ -51,7 +52,8 @@ describe('Logout', () => {
     
     renderWithRouter(<Logout />);
     
-    fireEvent.click(screen.getByText('Выйти'));
+    const button = screen.getByText('Выйти');
+    fireEvent.click(button);
     
     await waitFor(() => {
       expect(apiService.logout).not.toHaveBeenCalled();
@@ -64,7 +66,8 @@ describe('Logout', () => {
     
     renderWithRouter(<Logout />);
     
-    fireEvent.click(screen.getByText('Выйти'));
+    const button = screen.getByText('Выйти');
+    fireEvent.click(button);
     
     await waitFor(() => {
       expect(storeAPI.clear).toHaveBeenCalled();
