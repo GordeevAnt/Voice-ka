@@ -74,6 +74,7 @@ Thumbs.db
 
 # Результаты тестов
 playright-report/
+data/
 test-results/
 coverage/
 *.gcov
