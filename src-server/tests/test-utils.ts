@@ -1,7 +1,7 @@
 import { WebSocket } from 'ws';
 
 export interface WsMessage {
-  message_type: string;
+  type: string;  // было message_type
   request_id?: string;
   data?: any;
   guild_id?: number;
@@ -80,7 +80,7 @@ export class WebSocketTestClient {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.responseQueue.delete(message.request_id || '');
-        reject(new Error(`Timeout waiting for response to ${message.message_type}`));
+        reject(new Error(`Timeout waiting for response to ${message.type}`));
       }, 5000);
 
       if (message.request_id) {
@@ -138,14 +138,14 @@ export class WebSocketTestClient {
 
   async ping(): Promise<WsResponse> {
     return this.send({
-      message_type: 'ping',
+      type: 'ping',  // было message_type
       request_id: `ping-${Date.now()}`
     });
   }
 
   async login(login: string, password: string): Promise<WsResponse> {
     return this.send({
-      message_type: 'login',
+      type: 'login',  // было message_type
       request_id: `login-${Date.now()}`,
       data: {
         login,

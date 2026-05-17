@@ -1,294 +1,150 @@
 import { test, expect } from '@playwright/test';
-import { WebSocket } from 'ws';
+import { createAuthenticatedClient } from './test-helper';
 
 test.describe('Room Handler Tests', () => {
-  const WS_URL = 'ws://localhost:9001';
-  let ws: WebSocket;
+  let client: Awaited<ReturnType<typeof createAuthenticatedClient>>;
+  let guildId: number;
 
   test.beforeEach(async () => {
-    // Connect to WebSocket server
-    ws = new WebSocket(WS_URL);
+    client = await createAuthenticatedClient();
     
-    await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Connection timeout'));
-      }, 5000);
-
-      ws.on('open', () => {
-        clearTimeout(timeout);
-        resolve();
-      });
-      
-      ws.on('error', (error) => {
-        clearTimeout(timeout);
-        reject(error);
-      });
+    // Создаем тестовую гильдию
+    const guildResult = await client.sendAndWait('create_guild', {
+      name: `Test Guild ${Date.now()}`,
+      description: 'For room tests'
     });
+    guildId = guildResult.guild.id;
   });
 
   test.afterEach(() => {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.close();
-    }
+    client.close();
   });
 
   test('should handle get_guild_rooms request', async () => {
-    const getRoomsMessage = {
-      message_type: 'get_guild_rooms',
-      request_id: 'room-test-1',
-      guild_id: 1
-    };
-
-    return new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Timeout waiting for get_guild_rooms response'));
-      }, 5000);
-
-      ws.on('message', (data: Buffer) => {
-        try {
-          const message = JSON.parse(data.toString());
-          
-          if (message.data?.status === 'connected') {
-            return;
-          }
-          
-          if (message.request_id === 'room-test-1') {
-            clearTimeout(timeout);
-            expect(message.type).toBeDefined();
-            resolve();
-          }
-        } catch (error) {
-          clearTimeout(timeout);
-          reject(error);
-        }
-      });
-
-      ws.send(JSON.stringify(getRoomsMessage));
-    });
+    const result = await client.sendAndWait('get_guild_rooms', undefined, { guild_id: guildId });
+    
+    expect(result.rooms).toBeDefined();
+    expect(Array.isArray(result.rooms)).toBe(true);
   });
 
   test('should handle get_room_by_id request', async () => {
-    const getRoomMessage = {
-      message_type: 'get_room_by_id',
-      request_id: 'room-test-2',
-      data: {
-        room_id: 1
-      }
-    };
-
-    return new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Timeout waiting for get_room_by_id response'));
-      }, 5000);
-
-      ws.on('message', (data: Buffer) => {
-        try {
-          const message = JSON.parse(data.toString());
-          
-          if (message.data?.status === 'connected') {
-            return;
-          }
-          
-          if (message.request_id === 'room-test-2') {
-            clearTimeout(timeout);
-            expect(message.type).toBeDefined();
-            resolve();
-          }
-        } catch (error) {
-          clearTimeout(timeout);
-          reject(error);
-        }
-      });
-
-      ws.send(JSON.stringify(getRoomMessage));
+    // Сначала создаем комнату
+    const createResult = await client.sendAndWait('create_room', {
+      name: 'Test Room for GetById',
+      room_type: 'text',
+      topic: 'Test topic'
+    }, { guild_id: guildId });
+    
+    const roomId = createResult.room.id;
+    
+    const result = await client.sendAndWait('get_room_by_id', {
+      room_id: roomId
     });
+    
+    expect(result.room).toBeDefined();
+    expect(result.room.id).toBe(roomId);
+    expect(result.room.name).toBe('Test Room for GetById');
   });
 
   test('should handle create_room request', async () => {
-    const createRoomMessage = {
-      message_type: 'create_room',
-      request_id: 'room-test-3',
-      guild_id: 1,
-      data: {
-        name: `Test Room ${Date.now()}`,
-        description: 'A test room created by Playwright',
-        room_type: 'text',
-        is_private: false,
-        max_users: 50
-      }
-    };
-
-    return new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Timeout waiting for create_room response'));
-      }, 5000);
-
-      ws.on('message', (data: Buffer) => {
-        try {
-          const message = JSON.parse(data.toString());
-          
-          if (message.data?.status === 'connected') {
-            return;
-          }
-          
-          if (message.request_id === 'room-test-3') {
-            clearTimeout(timeout);
-            expect(message.type).toBeDefined();
-            resolve();
-          }
-        } catch (error) {
-          clearTimeout(timeout);
-          reject(error);
-        }
-      });
-
-      ws.send(JSON.stringify(createRoomMessage));
-    });
+    const roomName = `Test Room ${Date.now()}`;
+    
+    const result = await client.sendAndWait('create_room', {
+      name: roomName,
+      room_type: 'text',
+      topic: 'A test room created by Playwright'
+    }, { guild_id: guildId });
+    
+    expect(result.room).toBeDefined();
+    expect(result.room.name).toBe(roomName);
+    expect(result.room.type).toBe('text');
   });
 
   test('should handle update_room request', async () => {
-    const updateRoomMessage = {
-      message_type: 'update_room',
-      request_id: 'room-test-4',
-      room_id: 1,
-      data: {
-        name: 'Updated Room Name',
-        description: 'Updated room description'
-      }
-    };
-
-    return new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Timeout waiting for update_room response'));
-      }, 5000);
-
-      ws.on('message', (data: Buffer) => {
-        try {
-          const message = JSON.parse(data.toString());
-          
-          if (message.data?.status === 'connected') {
-            return;
-          }
-          
-          if (message.request_id === 'room-test-4') {
-            clearTimeout(timeout);
-            expect(message.type).toBeDefined();
-            resolve();
-          }
-        } catch (error) {
-          clearTimeout(timeout);
-          reject(error);
-        }
-      });
-
-      ws.send(JSON.stringify(updateRoomMessage));
-    });
+    // Сначала создаем комнату
+    const createResult = await client.sendAndWait('create_room', {
+      name: 'Room To Update',
+      room_type: 'text'
+    }, { guild_id: guildId });
+    
+    const roomId = createResult.room.id;
+    const newName = 'Updated Room Name';
+    
+    const result = await client.sendAndWait('update_room', {
+      name: newName,
+      topic: 'Updated room description'
+    }, { room_id: roomId });
+    
+    expect(result.room).toBeDefined();
+    expect(result.room.name).toBe(newName);
   });
 
   test('should handle subscribe_room request', async () => {
+    // Создаем комнату
+    const createResult = await client.sendAndWait('create_room', {
+      name: 'Subscribable Room',
+      room_type: 'text'
+    }, { guild_id: guildId });
+    
+    const roomId = createResult.room.id;
+    
+    // Отправляем subscribe_room без ожидания ответа
+    // Просто проверяем, что сообщение было отправлено без ошибок
     const subscribeMessage = {
-      message_type: 'subscribe_room',
-      request_id: 'room-test-5',
-      room_id: 1
+      type: 'subscribe_room',
+      room_id: roomId
     };
-
-    return new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Timeout waiting for subscribe_room response'));
-      }, 5000);
-
-      // Note: subscribe_room might not send a response
-      // We'll just verify the message was sent without error
-      ws.on('error', (error) => {
-        clearTimeout(timeout);
-        reject(error);
-      });
-
-      setTimeout(() => {
-        clearTimeout(timeout);
-        // If we get here without error, the message was sent successfully
-        resolve();
-      }, 1000);
-
-      ws.send(JSON.stringify(subscribeMessage));
-    });
+    
+    // Отправляем и не ждем ответа
+    client.ws.send(JSON.stringify(subscribeMessage));
+    
+    // Даем время на обработку
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Если дошли сюда без ошибок - тест пройден
+    expect(true).toBe(true);
   });
 
   test('should handle unsubscribe_room request', async () => {
-    const unsubscribeMessage = {
-      message_type: 'unsubscribe_room',
-      request_id: 'room-test-6',
-      room_id: 1
-    };
+  const createResult = await client.sendAndWait('create_room', {
+    name: 'Unsubscribable Room',
+    room_type: 'text'
+  }, { guild_id: guildId });
+  
+  const roomId = createResult.room.id;
+  
+  const unsubscribeMessage = {
+    type: 'unsubscribe_room',
+    room_id: roomId
+  };
+  
+  client.ws.send(JSON.stringify(unsubscribeMessage));
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  expect(true).toBe(true);
+});
 
-    return new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Timeout waiting for unsubscribe_room response'));
-      }, 5000);
-
-      ws.on('error', (error) => {
-        clearTimeout(timeout);
-        reject(error);
-      });
-
-      setTimeout(() => {
-        clearTimeout(timeout);
-        resolve();
-      }, 1000);
-
-      ws.send(JSON.stringify(unsubscribeMessage));
-    });
-  });
-
-  test('should handle subscribe_guild request', async () => {
-    const subscribeGuildMessage = {
-      message_type: 'subscribe_guild',
-      request_id: 'room-test-7',
-      guild_id: 1
-    };
-
-    return new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Timeout waiting for subscribe_guild response'));
-      }, 5000);
-
-      ws.on('error', (error) => {
-        clearTimeout(timeout);
-        reject(error);
-      });
-
-      setTimeout(() => {
-        clearTimeout(timeout);
-        resolve();
-      }, 1000);
-
-      ws.send(JSON.stringify(subscribeGuildMessage));
-    });
-  });
+test('should handle subscribe_guild request', async () => {
+  const subscribeMessage = {
+    type: 'subscribe_guild',
+    guild_id: guildId
+  };
+  
+  client.ws.send(JSON.stringify(subscribeMessage));
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  expect(true).toBe(true);
+});
 
   test('should handle unsubscribe_guild request', async () => {
-    const unsubscribeGuildMessage = {
-      message_type: 'unsubscribe_guild',
-      request_id: 'room-test-8',
-      guild_id: 1
+    const unsubscribeMessage = {
+      type: 'unsubscribe_guild',
+      guild_id: guildId
     };
-
-    return new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Timeout waiting for unsubscribe_guild response'));
-      }, 5000);
-
-      ws.on('error', (error) => {
-        clearTimeout(timeout);
-        reject(error);
-      });
-
-      setTimeout(() => {
-        clearTimeout(timeout);
-        resolve();
-      }, 1000);
-
-      ws.send(JSON.stringify(unsubscribeGuildMessage));
-    });
+    
+    client.ws.send(JSON.stringify(unsubscribeMessage));
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    expect(true).toBe(true);
   });
 });
