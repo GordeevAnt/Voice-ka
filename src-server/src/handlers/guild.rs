@@ -630,7 +630,7 @@ pub async fn handle_get_user_guilds_with_role(user_id: i32) -> Result<Vec<serde_
     }).collect())
 }
 
-pub use get_user_guilds_ids as handle_get_user_guilds_ids;
+// pub use get_user_guilds_ids as handle_get_user_guilds_ids;
 
 pub async fn handle_get_user_roles_in_guild(
     user_id: i32, 
