@@ -1,4 +1,3 @@
-// src-server/src/lib.rs
 pub mod db;
 pub mod ws;
 pub mod handlers;

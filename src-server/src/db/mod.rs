@@ -1,4 +1,3 @@
-// src-tauri/src/db/mod.rs
 use sqlx::postgres::{PgPoolOptions};
 use sqlx::{PgPool, Executor};
 use std::sync::OnceLock;

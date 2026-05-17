@@ -1,4 +1,3 @@
-// widgets/Messages_List.tsx
 import { useEffect, useState, useCallback, memo, useRef } from "react";
 import "./Messages_List.css";
 import { apiService } from "../features/api.service";
