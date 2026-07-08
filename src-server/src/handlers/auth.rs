@@ -30,6 +30,7 @@ pub struct LoginResponse {
     pub user_id: i32,
     pub session_token: String,
     pub username: String,
+    pub avatar: Option<String>,
 }
 
 pub async fn handle_login(
@@ -40,15 +41,15 @@ pub async fn handle_login(
 
     // Получаем пользователя
     let user = sqlx::query!(
-        "SELECT id, username, password_hash FROM users WHERE username = $1 OR email = $1",
+        "SELECT id, username, avatar, password_hash FROM users WHERE username = $1 OR email = $1",
         data.login
     )
     .fetch_optional(pool)
     .await
     .map_err(|e| format!("Database error: {}", e))?;
 
-    let (user_id, username, stored_hash) = match user {
-        Some(u) => (u.id, u.username, u.password_hash),
+    let (user_id, username, avatar, stored_hash) = match user {
+        Some(u) => (u.id, u.username, u.avatar, u.password_hash),
         None => return Err("Invalid credentials".to_string()),
     };
 
@@ -154,6 +155,7 @@ pub async fn handle_login(
         user_id,
         session_token,
         username,
+        avatar,
     })
 }
 

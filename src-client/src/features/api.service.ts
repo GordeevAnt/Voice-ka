@@ -40,6 +40,13 @@ class ApiService {
                 // Ждем, пока аутентификация завершится
                 await wsService.waitForAuth();
                 
+                // 👇 СОХРАНЯЕМ ВСЕ ДАННЫЕ ПОЛЬЗОВАТЕЛЯ
+                await storeAPI.set('token', 'true');
+                await storeAPI.set('user_id', result.user_id);
+                await storeAPI.set('session_id', result.session_token);
+                await storeAPI.set('username', result.username || login);
+                await storeAPI.set('avatar', result.avatar || null);
+                
                 return [true, result.user_id, result.session_token];
             }
             return [false, 0, ''];
