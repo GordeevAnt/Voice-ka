@@ -37,6 +37,7 @@
 
 .message-header {
     display: flex;
+    justify-content: space-between;
     align-items: baseline;
     gap: 8px;
     margin-bottom: 4px;
