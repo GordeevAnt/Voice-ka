@@ -1120,31 +1120,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                             }
                                         }
 
-                                        "send_message" => {
-                                            if let (Some(uid), Some(uname), Some(data)) = (current_user_id, current_username, client_msg.data) {
-                                                if uid > 0 {
-                                                    if let (Some(room_id), Some(content)) = (
-                                                        data.get("room_id").and_then(|v| v.as_i64()),
-                                                        data.get("content").and_then(|v| v.as_str())
-                                                    ) {
-                                                        match handlers::message::handle_send_message(uid, &uname, room_id as i32, content, manager.clone()).await {
-                                                            Ok(message) => {
-                                                                let resp = WsMessage::success_response(request_id, json!({ "message": message }));
-                                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
-                                                                    serde_json::to_string(&resp).unwrap()
-                                                                ));
-                                                            }
-                                                            Err(e) => {
-                                                                let resp = WsMessage::error_response(request_id, &e);
-                                                                let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
-                                                                    serde_json::to_string(&resp).unwrap()
-                                                                ));
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
+    "send_message" => {
+        if let (Some(uid), Some(uname), Some(data)) = (current_user_id, current_username, client_msg.data) {
+            if uid > 0 {
+                if let (Some(room_id), Some(content)) = (
+                    data.get("room_id").and_then(|v| v.as_i64()),
+                    data.get("content").and_then(|v| v.as_str())
+                ) {
+                    match handlers::message::handle_send_message(uid, &uname, room_id as i32, content, manager.clone()).await {
+                        Ok(message) => {
+                            let resp = WsMessage::success_response(request_id, json!({ "message": message }));
+                            let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                serde_json::to_string(&resp).unwrap()
+                            ));
+                        }
+                        Err(e) => {
+                            let resp = WsMessage::error_response(request_id, &e);
+                            let _ = tx.send(tokio_tungstenite::tungstenite::Message::Text(
+                                serde_json::to_string(&resp).unwrap()
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
 
                                         // SUBSCRIPTIONS
                                         "subscribe_room" => {

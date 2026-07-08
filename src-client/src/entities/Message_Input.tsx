@@ -12,6 +12,13 @@ export function Message_Input({ roomId }: MessageInputProps) {
     const [isSending, setIsSending] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
 
+    const focusInput = () => {
+        // Используем requestAnimationFrame для гарантии после рендеринга
+        requestAnimationFrame(() => {
+            inputRef.current?.focus();
+        });
+    };
+
     const handleSend = async () => {
         if (!content.trim() || isSending) return;
 
@@ -19,10 +26,11 @@ export function Message_Input({ roomId }: MessageInputProps) {
         try {
             await apiService.sendMessage(roomId, content.trim());
             setContent("");
-            inputRef.current?.focus();
+            focusInput();
         } catch (err) {
             console.error("Failed to send message:", err);
             alert("Ошибка отправки сообщения");
+            focusInput();
         } finally {
             setIsSending(false);
         }
