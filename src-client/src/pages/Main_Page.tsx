@@ -19,6 +19,8 @@ export function Main_Page() {
     const [isLoading, setIsLoading] = useState(true);
     const [currentGuildId, setCurrentGuildId] = useState<number | null>(null);
     const [currentRoomId, setCurrentRoomId] = useState<number | undefined>(undefined);
+    const [currentRoomName, setCurrentRoomName] = useState<string>('');
+    const [currentRoomType, setCurrentRoomType] = useState<string>('text');
     const [currentUserId, setCurrentUserId] = useState<number>(1);
     const [isConnected, setIsConnected] = useState(false);
 
@@ -45,6 +47,13 @@ export function Main_Page() {
             const savedRoomId = await storeAPI.get<number>('current_room_id');
             if (savedRoomId) {
                 setCurrentRoomId(savedRoomId);
+                // Загружаем имя комнаты
+                const roomName = await storeAPI.get<string>('current_room_name');
+                const roomType = await storeAPI.get<string>('current_room_type');
+                if (roomName) {
+                    setCurrentRoomName(roomName);
+                    setCurrentRoomType(roomType || 'text');
+                }
             }
             
             setIsLoading(false);
@@ -76,17 +85,71 @@ export function Main_Page() {
         }
     }, [currentGuildId]);
 
+    // В Main_Page.tsx добавьте подписку на обновления комнаты и гильдии
+
+useEffect(() => {
+    // Подписываемся на обновление гильдии
+    const unsubscribeGuildUpdated = wsService.on('guild_updated', async (updatedGuild) => {
+        if (updatedGuild.id === currentGuildId) {
+            // Обновляем название гильдии в состоянии
+            await storeAPI.set('current_guild_name', updatedGuild.name);
+            await storeAPI.set('current_guild_icon', updatedGuild.icon || null);
+            console.log('✅ Updated guild data in store:', updatedGuild.name);
+        }
+    });
+
+    // Подписываемся на обновление комнаты
+    const unsubscribeRoomUpdated = wsService.on('room_updated', async (updatedRoom) => {
+            if (updatedRoom.id === currentRoomId) {
+                // Обновляем название комнаты в состоянии
+                setCurrentRoomName(updatedRoom.name);
+                setCurrentRoomType(updatedRoom.type || 'text');
+                await storeAPI.set('current_room_name', updatedRoom.name);
+                await storeAPI.set('current_room_type', updatedRoom.type || 'text');
+                console.log('✅ Updated room data in store:', updatedRoom.name);
+            }
+        });
+
+        return () => {
+            unsubscribeGuildUpdated();
+            unsubscribeRoomUpdated();
+        };
+    }, [currentGuildId, currentRoomId]);
+
     const handleGuildSelect = useCallback(async (guildId: number) => {
         console.log(`🔄 Switching to guild: ${guildId}`);
         setCurrentGuildId(guildId);
         await storeAPI.set('current_guild_id', guildId);
         setCurrentRoomId(undefined);
+        setCurrentRoomName('');
+        setCurrentRoomType('text');
         await storeAPI.delete('current_room_id');
+        await storeAPI.delete('current_room_name');
+        await storeAPI.delete('current_room_type');
+        
+        wsService.notify('guild_switched', { guild_id: guildId });
     }, []);
 
     const handleRoomSelect = useCallback(async (roomId: number) => {
         setCurrentRoomId(roomId);
         await storeAPI.set('current_room_id', roomId);
+        
+        // Получаем имя комнаты из списка
+        try {
+            const rooms = await storeAPI.get<any[]>('guild_rooms');
+            if (rooms) {
+                const room = rooms.find(r => r.id === roomId);
+                if (room) {
+                    setCurrentRoomName(room.name);
+                    setCurrentRoomType(room.type || 'text');
+                    await storeAPI.set('current_room_name', room.name);
+                    await storeAPI.set('current_room_type', room.type || 'text');
+                    console.log('✅ Saved room data:', room.name);
+                }
+            }
+        } catch (error) {
+            console.error('Error saving room data:', error);
+        }
     }, []);
 
     if (isLoading) {
@@ -137,8 +200,12 @@ export function Main_Page() {
 
                 <div className="room-container">
                     <div className="settings">
-                        <Info_Chanel_Button />
-                        <Info_Room_Button />
+                        <Info_Chanel_Button key={`chanel-${currentGuildId}`} />
+                        <Info_Room_Button 
+                            key={`room-${currentRoomId || 'none'}`}
+                            roomName={currentRoomName}
+                            roomType={currentRoomType}
+                        />
                         <Info_Personal_Account_Button />
                         <Logout />
                     </div>

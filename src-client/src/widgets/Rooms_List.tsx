@@ -79,6 +79,20 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
             console.log('📋 Loaded rooms for guild', guildId, ':', guildRooms);
             const textRooms = guildRooms.filter(r => r.type === 'text');
             setRooms(textRooms);
+            
+            // 👇 СОХРАНЯЕМ ВСЕ КОМНАТЫ В ХРАНИЛИЩЕ
+            await storeAPI.set('guild_rooms', guildRooms);
+            
+            // 👇 СОХРАНЯЕМ ДАННЫЕ ТЕКУЩЕЙ КОМНАТЫ
+            const currentRoomId = await storeAPI.get<number>('current_room_id');
+            if (currentRoomId) {
+                const currentRoom = guildRooms.find((r: any) => r.id === currentRoomId);
+                if (currentRoom) {
+                    await storeAPI.set('current_room_name', currentRoom.name);
+                    await storeAPI.set('current_room_type', currentRoom.type || 'text');
+                    console.log('✅ Saved current room data:', currentRoom.name);
+                }
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : "Ошибка загрузки комнат");
             console.error("Failed to load rooms:", err);
@@ -134,6 +148,10 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
                 if (exists) return prev;
                 return [...prev, newRoom];
             });
+            
+            // 👇 СОХРАНЯЕМ ДАННЫЕ НОВОЙ КОМНАТЫ
+            await storeAPI.set('current_room_name', newRoom.name);
+            await storeAPI.set('current_room_type', newRoom.type || 'text');
             
             setShowCreateModal(false);
             setNewRoomName("");

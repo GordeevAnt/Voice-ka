@@ -1,5 +1,5 @@
 // Chanels_List.tsx
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Switch_Chanel_Button } from "../shared/Switch_Chanel_Button";
 import { apiService } from "../features/api.service";
 import { storeAPI } from "../features/useStore";
@@ -49,6 +49,20 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
             const guildsData = await apiService.getUserGuilds(userId);
             console.log('📋 Loaded guilds:', guildsData);
             setGuilds(guildsData);
+            
+            // 👇 СОХРАНЯЕМ ВСЕ ГИЛЬДИИ В ХРАНИЛИЩЕ
+            await storeAPI.set('user_guilds', guildsData);
+            
+            // 👇 СОХРАНЯЕМ ДАННЫЕ ТЕКУЩЕЙ ГИЛЬДИИ
+            const currentGuildId = await storeAPI.get<number>('current_guild_id');
+            if (currentGuildId) {
+                const currentGuild = guildsData.find((g: any) => g.id === currentGuildId);
+                if (currentGuild) {
+                    await storeAPI.set('current_guild_name', currentGuild.name);
+                    await storeAPI.set('current_guild_icon', currentGuild.icon || null);
+                    console.log('✅ Saved current guild data:', currentGuild.name);
+                }
+            }
         } catch (err) {
             console.error("Ошибка загрузки каналов:", err);
         } finally {
@@ -120,10 +134,19 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
         fetchGuilds();
     };
 
-    const handleGuildSelect = (guildId: number) => {
+    const handleGuildSelect = useCallback(async (guildId: number) => {
         console.log(`🔄 Chanels_List: guild selected: ${guildId}`);
+        
+        // Сохраняем данные выбранной гильдии
+        const guild = guilds.find(g => g.id === guildId);
+        if (guild) {
+            await storeAPI.set('current_guild_name', guild.name);
+            await storeAPI.set('current_guild_icon', guild.icon || null);
+            console.log('✅ Saved selected guild data:', guild.name);
+        }
+        
         onGuildSelect(guildId);
-    };
+    }, [guilds, onGuildSelect]);
 
     const handleCreateGuild = async () => {
         if (!newGuildName.trim()) {
