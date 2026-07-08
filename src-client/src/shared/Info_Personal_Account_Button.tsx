@@ -62,7 +62,7 @@ export default function Info_Personal_Account_Button() {
 
     return (
         <Link to="/person_acc_info">
-            <div className="user-info-btn" title={user.username}>
+            <div className="user-info-btn">
                 {user.avatar ? (
                     <img src={user.avatar} alt={user.username} className="user-info-avatar" />
                 ) : (

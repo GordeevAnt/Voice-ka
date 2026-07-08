@@ -126,7 +126,7 @@ export default function Info_Room_Button({ roomName, roomType }: InfoRoomButtonP
 
     return (
         <Link to="/room_info">
-            <div className="room-info-btn" title={room.name}>
+            <div className="room-info-btn">
                 <span className="room-info-icon">{getRoomIcon(room.type)}</span>
                 <span className="room-info-name">{room.name}</span>
             </div>

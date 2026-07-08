@@ -104,7 +104,7 @@ export default function Info_Chanel_Button() {
 
     return (
         <Link to="/chanel_info">
-            <div className="chanel-info-btn" title={guild.name}>
+            <div className="chanel-info-btn">
                 {guild.icon ? (
                     <img src={guild.icon} alt={guild.name} className="chanel-info-icon" />
                 ) : (
