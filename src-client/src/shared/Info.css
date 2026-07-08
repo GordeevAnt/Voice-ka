@@ -1,71 +1,166 @@
-.chanel-info-btn {
-    width: 45px;
-    height: 45px;
-    cursor: pointer;
-    border-radius: 50%;
-    overflow: hidden;
-}
+/* Info.css - стили для информационных кнопок */
 
-.chanel-info-icon {
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    object-fit: cover;
-    display: flex;
+/* Общие стили для всех информационных кнопок */
+.chanel-info-btn,
+.user-info-btn,
+.room-info-btn {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: #fff;
-    font-weight: bold;
-    font-size: 16px;
-    background-color: #95a5a6;
 }
 
-/* Стили для кнопки комнаты */
+/* Стили для ссылок внутри информационных кнопок */
+.chanel-info-btn a,
+.user-info-btn a,
+.room-info-btn a {
+    display: flex;  /* или display: block */
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 100%;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    position: relative;
+    /* Гарантируем, что ссылка занимает весь контейнер */
+    box-sizing: border-box;
+}
+
+.chanel-info-btn,
+.user-info-btn {
+    display: flex;  /* Меняем с inline-flex на flex */
+    align-items: center;
+    justify-content: center;
+    width: 48px;    /* Фиксированная ширина */
+    height: 48px;   /* Фиксированная высота */
+    flex-shrink: 0; /* Запрещаем сжатие */
+}
+
+/* Прямоугольная кнопка с закругленными углами (комната) */
 .room-info-btn {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    background-color: #2f3136;
-    border-radius: 8px;
-    color: #dcddde;
-    text-decoration: none;
-    cursor: pointer;
-    transition: background-color 0.2s;
+    justify-content: center;
+    flex-shrink: 0;
 }
 
-.room-info-btn:hover {
-    background-color: #3a3c43;
+.room-info-btn a {
+    width: auto;        /* Автоматическая ширина в зависимости от контента */
+    min-width: 48px;    /* Минимальная ширина как у круглых кнопок */
+    height: 48px;
+    padding: 0 16px;    /* Отступы слева и справа для текста */
+    border-radius: 10px; /* Закругленные углы как у Logout */
+    background: #2a2a30;
+    gap: 8px;          /* Расстояние между иконкой и текстом */
 }
 
+.room-info-btn a:hover {
+    background: #3a3a40; /* Темнее при наведении */
+    transform: scale(1.02);
+    outline: 3px solid #5865f2;
+    outline-offset: 5px;
+    border-radius: 10px;
+    transition: all 0.1s ease;
+}
+
+/* Неактивная комната */
+.room-info-btn a.room-info-btn-inactive {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none; /* Блокируем все взаимодействия */
+    background: #1a1a22; /* Более темный фон для неактивного состояния */
+    border: 1px solid #40404b;
+}
+
+.room-info-btn a.room-info-btn-inactive:hover {
+    transform: none;
+    outline: none;
+    background: #1a1a22;
+    border-color: #2a2a30;
+}
+
+/* Стили для текста в неактивном состоянии */
+.room-info-btn a.room-info-btn-inactive .room-info-text {
+    color: #9595bd;
+}
+
+.room-info-btn a.room-info-btn-inactive .room-info-icon {
+    color: #9595bd;
+}
+
+.chanel-info-btn a:hover,
+.user-info-btn a:hover {
+    outline: 3px solid #5865f2;
+    outline-offset: 5px;
+    border-radius: 100%;
+    transition: all 0.1s ease;
+}
+
+/* Стили для иконок/аватаров */
+.chanel-info-icon,
+.user-info-avatar,
 .room-info-icon {
-    font-size: 18px;
-}
-
-.room-info-name {
-    font-size: 14px;
-    font-weight: 500;
-    max-width: 120px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.user-info-btn {
-    width: 45px;
-    height: 45px;
-}
-
-.user-info-avatar {
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    border-radius: 100%;
     object-fit: cover;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #fff;
-    font-weight: bold;
     font-size: 16px;
-    background-color: #95a5a6;
+    font-weight: 600;
+    color: #ffffff;
+    user-select: none;
+}
+
+/* Специфичные стили для иконки комнаты */
+.room-info-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    background: transparent;
+    color: #c0c0d0;
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+}
+
+/* Текст комнаты */
+.room-info-text {
+    color: #c0c0d0;
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px; /* Максимальная ширина текста */
+}
+
+/* Стили для кнопки Logout */
+.logout-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 68px;
+    height: 48px;
+    border-radius: 10px;
+    background: #2a2a30;
+    border: none;
+    color: #8a8a9a;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 15px;
+    padding: 0;
+}
+
+.logout-btn:hover {
+    background: #e74c3c;
+    transform: scale(1.02);
+    color: #ffffff;
+}
+
+.logout-btn:active {
+    transform: scale(0.95);
 }

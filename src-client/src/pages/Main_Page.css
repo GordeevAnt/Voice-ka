@@ -26,43 +26,15 @@
 
 .settings {
     background: #1a1a22;
-    min-height: 48px;
+    min-height: 60px;
     flex: 0 0 auto;
     display: flex;
     flex-direction: row;
-    justify-content: space-around;
-    gap: 2px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
     padding: 8px 12px;
     border-bottom: 1px solid #2a2a30;
-}
-
-.settings a {
-    color: #8a8a9a;
-    text-decoration: none;
-    font-size: 13px;
-    padding: 6px 12px;
-    border-radius: 6px;
-    transition: all 0.2s;
-}
-
-.settings a:hover {
-    background: #2a2a30;
-    color: #c0c0d0;
-}
-
-.settings button {
-    background: #2a2a30;
-    border: none;
-    color: #8a8a9a;
-    padding: 6px 12px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.settings button:hover {
-    background: #3a3a40;
-    color: #c0c0d0;
 }
 
 .room-selector {

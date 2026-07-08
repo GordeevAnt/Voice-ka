@@ -38,10 +38,8 @@ export default function Info_Chanel_Button() {
     useEffect(() => {
         loadGuildData();
 
-        // 👇 Подписываемся на обновления гильдии
         const unsubscribeGuildUpdated = wsService.on('guild_updated', (updatedGuild) => {
             console.log('🔄 Guild updated via WS:', updatedGuild);
-            // Проверяем, что это текущая гильдия
             if (currentGuildId && updatedGuild.id === currentGuildId) {
                 setGuild(prev => prev ? {
                     ...prev,
@@ -49,7 +47,6 @@ export default function Info_Chanel_Button() {
                     icon: updatedGuild.icon !== undefined ? updatedGuild.icon : prev.icon
                 } : null);
                 
-                // Обновляем данные в хранилище
                 storeAPI.set('current_guild_name', updatedGuild.name);
                 if (updatedGuild.icon !== undefined) {
                     storeAPI.set('current_guild_icon', updatedGuild.icon);
@@ -57,21 +54,12 @@ export default function Info_Chanel_Button() {
             }
         });
 
-        // 👇 Подписываемся на создание новой гильдии
-        const unsubscribeGuildCreated = wsService.on('guild_created', (newGuild) => {
-            console.log('🆕 Guild created via WS:', newGuild);
-            loadGuildData();
-        });
-
-        // 👇 Подписываемся на событие смены гильдии
-        const unsubscribeGuildSwitched = wsService.on('guild_switched', (data) => {
-            console.log('🔄 Guild switched, reloading data');
-            loadGuildData();
+        const unsubscribeGuildSwitched = wsService.on('guild_switched', () => {
+            setTimeout(loadGuildData, 100);
         });
 
         return () => {
             unsubscribeGuildUpdated();
-            unsubscribeGuildCreated();
             unsubscribeGuildSwitched();
         };
     }, [currentGuildId]);
@@ -103,8 +91,8 @@ export default function Info_Chanel_Button() {
     if (!guild) return null;
 
     return (
-        <Link to="/chanel_info">
-            <div className="chanel-info-btn">
+        <div className="chanel-info-btn">
+            <Link to="/chanel_info" data-tooltip={guild.name}>
                 {guild.icon ? (
                     <img src={guild.icon} alt={guild.name} className="chanel-info-icon" />
                 ) : (
@@ -115,7 +103,7 @@ export default function Info_Chanel_Button() {
                         {getInitials(guild.name)}
                     </div>
                 )}
-            </div>
-        </Link>
+            </Link>
+        </div>
     );
 }

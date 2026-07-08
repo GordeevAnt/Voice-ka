@@ -205,6 +205,7 @@ useEffect(() => {
                             key={`room-${currentRoomId || 'none'}`}
                             roomName={currentRoomName}
                             roomType={currentRoomType}
+                            isActive={!!currentRoomId}
                         />
                         <Info_Personal_Account_Button />
                         <Logout />

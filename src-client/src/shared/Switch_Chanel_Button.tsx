@@ -122,10 +122,8 @@ export function Switch_Chanel_Button({
             className={getButtonClass()}
             onClick={handleClick}
             disabled={isActive || isLoadingRoles}
-            title={isLoadingRoles ? 'Loading roles...' : userRoles.map(r => r.name).join(', ')}
         >
             <img src={icon} alt={`Channel ${guildId}`} />
-            {isLoadingRoles && <span className="loading-indicator">...</span>}
         </button>
     )
 }

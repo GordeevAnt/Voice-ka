@@ -231,108 +231,154 @@ pub async fn handle_register(data: RegisterData) -> Result<(bool, i32), String> 
     .await
     .map_err(|e| format!("Registration error: {}", e))?;
 
-    // Создаем личный сервер
-    let guild_name = format!("{}'s Server", data.login);
-    let guild_id: i32 = sqlx::query_scalar!(
-        "INSERT INTO guilds (name, owner_id, description, created_at, updated_at)
-         VALUES ($1, $2, 'Personal server', $3, $3)
-         RETURNING id",
-        guild_name,
-        user_id,
-        Utc::now()
+    // 👇 ПРИСОЕДИНЯЕМ ПОЛЬЗОВАТЕЛЯ К СУЩЕСТВУЮЩЕМУ СЕРВЕРУ (ID = 1)
+    let main_guild_id = 1;
+
+    // Проверяем, существует ли сервер с id=1
+    let guild_exists: Option<bool> = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM guilds WHERE id = $1)",
+        main_guild_id
     )
     .fetch_one(&mut *transaction)
     .await
-    .map_err(|e| format!("Guild creation error: {}", e))?;
+    .map_err(|e| e.to_string())?;
 
-    // Добавляем пользователя в члены
+    if !guild_exists.unwrap_or(false) {
+        // Если сервера с id=1 нет, создаем его
+        let guild_name = "Voice-ka".to_string();
+        sqlx::query!(
+            "INSERT INTO guilds (id, name, owner_id, description, created_at, updated_at)
+             VALUES ($1, $2, $3, 'Main server', $4, $4)",
+            main_guild_id,
+            guild_name,
+            user_id, // Владелец - первый зарегистрированный пользователь
+            Utc::now()
+        )
+        .execute(&mut *transaction)
+        .await
+        .map_err(|e| format!("Guild creation error: {}", e))?;
+
+        // Создаем роли для сервера
+        // 1. Admin роль с ВСЕМИ правами
+        sqlx::query!(
+            "INSERT INTO roles (guild_id, name, position, permissions, created_at, updated_at)
+             VALUES ($1, 'Admin', 100, 126, $2, $2)",
+            main_guild_id,
+            Utc::now()
+        )
+        .execute(&mut *transaction)
+        .await
+        .map_err(|e| e.to_string())?;
+
+        // 2. @everyone роль с правом отправки сообщений
+        sqlx::query!(
+            "INSERT INTO roles (guild_id, name, position, permissions, created_at, updated_at)
+             VALUES ($1, '@everyone', 0, 64, $2, $2)",
+            main_guild_id,
+            Utc::now()
+        )
+        .execute(&mut *transaction)
+        .await
+        .map_err(|e| e.to_string())?;
+
+        // 3. Создаем текстовую комнату
+        sqlx::query!(
+            "INSERT INTO rooms (name, type, guild_id, position, created_at, updated_at)
+             VALUES ('general', 'text', $1, 0, $2, $2)",
+            main_guild_id,
+            Utc::now()
+        )
+        .execute(&mut *transaction)
+        .await
+        .map_err(|e| e.to_string())?;
+
+        // 4. Создаем голосовую комнату (Voice-ka)
+        sqlx::query!(
+            "INSERT INTO rooms (name, type, guild_id, position, bitrate, created_at, updated_at)
+             VALUES ('Voice-ka', 'voice', $1, 1, 64000, $2, $2)",
+            main_guild_id,
+            Utc::now()
+        )
+        .execute(&mut *transaction)
+        .await
+        .map_err(|e| e.to_string())?;
+    }
+
+    // Добавляем пользователя в члены сервера
     sqlx::query!(
         "INSERT INTO guild_members (user_id, guild_id, joined_at)
          VALUES ($1, $2, $3)",
         user_id,
-        guild_id,
+        main_guild_id,
         Utc::now()
     )
     .execute(&mut *transaction)
     .await
     .map_err(|e| e.to_string())?;
 
-    // 👇 СОЗДАЕМ РОЛИ С ПРАВИЛЬНЫМИ ПРАВАМИ
+    // Получаем роль @everyone для этого сервера
+    let everyone_role_id: Option<i32> = sqlx::query_scalar!(
+        "SELECT id FROM roles WHERE guild_id = $1 AND name = '@everyone'",
+        main_guild_id
+    )
+    .fetch_optional(&mut *transaction)
+    .await
+    .map_err(|e| e.to_string())?;
 
-    // 1. Создаем роль Admin с ВСЕМИ правами (126 = все права)
-    let admin_role_id: i32 = sqlx::query_scalar!(
-        "INSERT INTO roles (guild_id, name, position, permissions, created_at, updated_at)
-         VALUES ($1, 'Admin', 100, 126, $2, $2)
-         RETURNING id",
-        guild_id,
-        Utc::now()
+    if let Some(role_id) = everyone_role_id {
+        // Назначаем роль @everyone новому пользователю
+        sqlx::query!(
+            "INSERT INTO member_roles (user_id, role_id, guild_id)
+             VALUES ($1, $2, $3)",
+            user_id,
+            role_id,
+            main_guild_id
+        )
+        .execute(&mut *transaction)
+        .await
+        .map_err(|e| e.to_string())?;
+    }
+
+    // Проверяем, является ли пользователь первым (владельцем)
+    let is_first_user: Option<bool> = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM guilds WHERE id = $1 AND owner_id = $2)",
+        main_guild_id,
+        user_id
     )
     .fetch_one(&mut *transaction)
     .await
     .map_err(|e| e.to_string())?;
 
-    // 2. Создаем роль @everyone с правом отправки сообщений (64)
-    let everyone_role_id: i32 = sqlx::query_scalar!(
-        "INSERT INTO roles (guild_id, name, position, permissions, created_at, updated_at)
-         VALUES ($1, '@everyone', 0, 64, $2, $2)
-         RETURNING id",
-        guild_id,
-        Utc::now()
-    )
-    .fetch_one(&mut *transaction)
-    .await
-    .map_err(|e| e.to_string())?;
+    // Если пользователь - владелец, назначаем ему роль Admin
+    if is_first_user.unwrap_or(false) {
+        let admin_role_id: Option<i32> = sqlx::query_scalar!(
+            "SELECT id FROM roles WHERE guild_id = $1 AND name = 'Admin'",
+            main_guild_id
+        )
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(|e| e.to_string())?;
 
-    // 3. Назначаем владельцу роль Admin (ВСЕ права)
-    sqlx::query!(
-        "INSERT INTO member_roles (user_id, role_id, guild_id)
-         VALUES ($1, $2, $3)",
-        user_id,
-        admin_role_id,
-        guild_id
-    )
-    .execute(&mut *transaction)
-    .await
-    .map_err(|e| e.to_string())?;
-
-    // 4. Также назначаем владельцу роль @everyone (для базовых прав)
-    sqlx::query!(
-        "INSERT INTO member_roles (user_id, role_id, guild_id)
-         VALUES ($1, $2, $3)",
-        user_id,
-        everyone_role_id,
-        guild_id
-    )
-    .execute(&mut *transaction)
-    .await
-    .map_err(|e| e.to_string())?;
-
-    // 5. Создаем текстовую комнату
-    sqlx::query!(
-        "INSERT INTO rooms (name, type, guild_id, position, created_at, updated_at)
-         VALUES ('general', 'text', $1, 0, $2, $2)",
-        guild_id,
-        Utc::now()
-    )
-    .execute(&mut *transaction)
-    .await
-    .map_err(|e| e.to_string())?;
-
-    // 6. Создаем голосовую комнату
-    sqlx::query!(
-        "INSERT INTO rooms (name, type, guild_id, position, bitrate, created_at, updated_at)
-         VALUES ('General Voice', 'voice', $1, 1, 64000, $2, $2)",
-        guild_id,
-        Utc::now()
-    )
-    .execute(&mut *transaction)
-    .await
-    .map_err(|e| e.to_string())?;
+        if let Some(role_id) = admin_role_id {
+            sqlx::query!(
+                "INSERT INTO member_roles (user_id, role_id, guild_id)
+                 VALUES ($1, $2, $3)
+                 ON CONFLICT (user_id, role_id, guild_id) DO NOTHING",
+                user_id,
+                role_id,
+                main_guild_id
+            )
+            .execute(&mut *transaction)
+            .await
+            .map_err(|e| e.to_string())?;
+        }
+    }
 
     // Аудит-лог
     let audit_data = json!({
         "username": data.login,
-        "email": data.email
+        "email": data.email,
+        "action": "registered_and_joined_main_server"
     });
 
     let audit_str = audit_data.to_string();
@@ -341,7 +387,7 @@ pub async fn handle_register(data: RegisterData) -> Result<(bool, i32), String> 
         "INSERT INTO audit_logs (guild_id, user_id, action_type, target_id, changes, created_at)
         VALUES ($1, $2, 'USER_REGISTER', $3, $4::jsonb, $5)"
     )
-    .bind(guild_id)
+    .bind(main_guild_id)
     .bind(user_id)
     .bind(user_id)
     .bind(audit_str)
@@ -354,10 +400,8 @@ pub async fn handle_register(data: RegisterData) -> Result<(bool, i32), String> 
         .await
         .map_err(|e| e.to_string())?;
 
-    println!("✅ User {} (ID: {}) registered with guild {}", data.login, user_id, guild_id);
-    println!("   - Admin role created with all permissions (126)");
-    println!("   - @everyone role created with SEND_MESSAGES permission (64)");
-    println!("   - User assigned both Admin and @everyone roles");
+    println!("✅ User {} (ID: {}) registered and joined main server (ID: {})", 
+             data.login, user_id, main_guild_id);
 
     Ok((true, user_id))
 }
