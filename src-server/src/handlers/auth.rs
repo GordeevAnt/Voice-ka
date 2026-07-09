@@ -40,16 +40,21 @@ pub async fn handle_login(
     let pool = get_db_pool();
 
     // Получаем пользователя
-    let user = sqlx::query!(
-        "SELECT id, username, avatar, password_hash FROM users WHERE username = $1 OR email = $1",
-        data.login
+    let user = sqlx::query(
+        "SELECT id, username, avatar, password_hash FROM users WHERE username = $1 OR email = $1"
     )
+    .bind(&data.login)
     .fetch_optional(pool)
     .await
     .map_err(|e| format!("Database error: {}", e))?;
 
     let (user_id, username, avatar, stored_hash) = match user {
-        Some(u) => (u.id, u.username, u.avatar, u.password_hash),
+        Some(u) => (
+            u.get::<i32, _>(0),
+            u.get::<String, _>(1),
+            u.get::<Option<String>, _>(2),
+            u.get::<String, _>(3),
+        ),
         None => return Err("Invalid credentials".to_string()),
     };
 
@@ -67,23 +72,23 @@ pub async fn handle_login(
         .map_err(|e| e.to_string())?;
 
     // Закрываем старые сессии
-    sqlx::query!(
+    sqlx::query(
         "UPDATE websocket_sessions 
         SET status = 'closed', disconnected_at = $1 
-        WHERE user_id = $2 AND status = 'active'",
-        Utc::now(),
-        user_id
+        WHERE user_id = $2 AND status = 'active'"
     )
+    .bind(Utc::now())
+    .bind(user_id)
     .execute(&mut *transaction)
     .await
     .map_err(|e| e.to_string())?;
 
     // Обновляем статус пользователя
-    sqlx::query!(
-        "UPDATE users SET status = 'online', last_seen = $1, updated_at = $1 WHERE id = $2",
-        Utc::now(),
-        user_id
+    sqlx::query(
+        "UPDATE users SET status = 'online', last_seen = $1, updated_at = $1 WHERE id = $2"
     )
+    .bind(Utc::now())
+    .bind(user_id)
     .execute(&mut *transaction)
     .await
     .map_err(|e| e.to_string())?;
@@ -101,19 +106,19 @@ pub async fn handle_login(
     .bind(data.ip_address.as_deref().unwrap_or("0.0.0.0"))
     .bind(&data.user_agent)
     .bind(now)
-    .bind(now)
     .execute(&mut *transaction)
     .await
     .map_err(|e| e.to_string())?;
 
     // Аудит-лог
-    let user_guild_id: Option<i32> = sqlx::query_scalar!(
-        "SELECT id FROM guilds WHERE owner_id = $1 LIMIT 1",
-        user_id
+    let user_guild_id: Option<i32> = sqlx::query(
+        "SELECT id FROM guilds WHERE owner_id = $1 LIMIT 1"
     )
+    .bind(user_id)
     .fetch_optional(&mut *transaction)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| e.to_string())?
+    .map(|row| row.get::<i32, _>(0));
 
     if let Some(guild_id) = user_guild_id {
         let changes_str = json!({ "login": data.login }).to_string();
@@ -125,7 +130,7 @@ pub async fn handle_login(
         .bind(guild_id)
         .bind(user_id)
         .bind(user_id)
-        .bind(changes_str)
+        .bind(&changes_str)
         .bind(now)
         .execute(&mut *transaction)
         .await
@@ -186,20 +191,22 @@ pub async fn handle_register(data: RegisterData) -> Result<(bool, i32), String> 
     let pool = get_db_pool();
 
     // Проверка существования пользователя
-    let existing = sqlx::query!(
-        "SELECT username, email FROM users WHERE username = $1 OR email = $2",
-        data.login,
-        data.email
+    let existing = sqlx::query(
+        "SELECT username, email FROM users WHERE username = $1 OR email = $2"
     )
+    .bind(&data.login)
+    .bind(&data.email)
     .fetch_optional(pool)
     .await
     .map_err(|e| e.to_string())?;
 
     if let Some(user) = existing {
-        if user.username == data.login {
+        let db_username: String = user.get(0);
+        let db_email: String = user.get(1);
+        if db_username == data.login {
             return Err("Username already exists".to_string());
         }
-        if user.email == data.email {
+        if db_email == data.email {
             return Err("Email already exists".to_string());
         }
     }
@@ -218,156 +225,160 @@ pub async fn handle_register(data: RegisterData) -> Result<(bool, i32), String> 
         .map_err(|e| e.to_string())?;
 
     // Создаем пользователя
-    let user_id: i32 = sqlx::query_scalar!(
+    let user_id: i32 = sqlx::query(
         "INSERT INTO users (username, email, password_hash, status, created_at, updated_at) 
          VALUES ($1, $2, $3, 'offline', $4, $4)
-         RETURNING id",
-        data.login,
-        data.email,
-        password_hash,
-        Utc::now()
+         RETURNING id"
     )
+    .bind(&data.login)
+    .bind(&data.email)
+    .bind(&password_hash)
+    .bind(Utc::now())
     .fetch_one(&mut *transaction)
     .await
-    .map_err(|e| format!("Registration error: {}", e))?;
+    .map_err(|e| format!("Registration error: {}", e))?
+    .get::<i32, _>(0);
 
     // 👇 ПРИСОЕДИНЯЕМ ПОЛЬЗОВАТЕЛЯ К СУЩЕСТВУЮЩЕМУ СЕРВЕРУ (ID = 1)
     let main_guild_id = 1;
 
     // Проверяем, существует ли сервер с id=1
-    let guild_exists: Option<bool> = sqlx::query_scalar!(
-        "SELECT EXISTS(SELECT 1 FROM guilds WHERE id = $1)",
-        main_guild_id
+    let guild_exists: bool = sqlx::query(
+        "SELECT EXISTS(SELECT 1 FROM guilds WHERE id = $1)"
     )
+    .bind(main_guild_id)
     .fetch_one(&mut *transaction)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| e.to_string())?
+    .get::<bool, _>(0);
 
-    if !guild_exists.unwrap_or(false) {
+    if !guild_exists {
         // Если сервера с id=1 нет, создаем его
-        let guild_name = "Voice-ka".to_string();
-        sqlx::query!(
+        sqlx::query(
             "INSERT INTO guilds (id, name, owner_id, description, created_at, updated_at)
-             VALUES ($1, $2, $3, 'Main server', $4, $4)",
-            main_guild_id,
-            guild_name,
-            user_id, // Владелец - первый зарегистрированный пользователь
-            Utc::now()
+             VALUES ($1, $2, $3, 'Main server', $4, $4)"
         )
+        .bind(main_guild_id)
+        .bind("Voice-ka")
+        .bind(user_id) // Владелец - первый зарегистрированный пользователь
+        .bind(Utc::now())
         .execute(&mut *transaction)
         .await
         .map_err(|e| format!("Guild creation error: {}", e))?;
 
         // Создаем роли для сервера
         // 1. Admin роль с ВСЕМИ правами
-        sqlx::query!(
+        sqlx::query(
             "INSERT INTO roles (guild_id, name, position, permissions, created_at, updated_at)
-             VALUES ($1, 'Admin', 100, 126, $2, $2)",
-            main_guild_id,
-            Utc::now()
+             VALUES ($1, 'Admin', 100, 126, $2, $2)"
         )
+        .bind(main_guild_id)
+        .bind(Utc::now())
         .execute(&mut *transaction)
         .await
         .map_err(|e| e.to_string())?;
 
         // 2. @everyone роль с правом отправки сообщений
-        sqlx::query!(
+        sqlx::query(
             "INSERT INTO roles (guild_id, name, position, permissions, created_at, updated_at)
-             VALUES ($1, '@everyone', 0, 64, $2, $2)",
-            main_guild_id,
-            Utc::now()
+             VALUES ($1, '@everyone', 0, 64, $2, $2)"
         )
+        .bind(main_guild_id)
+        .bind(Utc::now())
         .execute(&mut *transaction)
         .await
         .map_err(|e| e.to_string())?;
 
         // 3. Создаем текстовую комнату
-        sqlx::query!(
+        sqlx::query(
             "INSERT INTO rooms (name, type, guild_id, position, created_at, updated_at)
-             VALUES ('general', 'text', $1, 0, $2, $2)",
-            main_guild_id,
-            Utc::now()
+             VALUES ('general', 'text', $1, 0, $2, $2)"
         )
+        .bind(main_guild_id)
+        .bind(Utc::now())
         .execute(&mut *transaction)
         .await
         .map_err(|e| e.to_string())?;
 
         // 4. Создаем голосовую комнату (Voice-ka)
-        sqlx::query!(
+        sqlx::query(
             "INSERT INTO rooms (name, type, guild_id, position, bitrate, created_at, updated_at)
-             VALUES ('Voice-ka', 'voice', $1, 1, 64000, $2, $2)",
-            main_guild_id,
-            Utc::now()
+             VALUES ('Voice-ka', 'voice', $1, 1, 64000, $2, $2)"
         )
+        .bind(main_guild_id)
+        .bind(Utc::now())
         .execute(&mut *transaction)
         .await
         .map_err(|e| e.to_string())?;
     }
 
     // Добавляем пользователя в члены сервера
-    sqlx::query!(
+    sqlx::query(
         "INSERT INTO guild_members (user_id, guild_id, joined_at)
-         VALUES ($1, $2, $3)",
-        user_id,
-        main_guild_id,
-        Utc::now()
+         VALUES ($1, $2, $3)"
     )
+    .bind(user_id)
+    .bind(main_guild_id)
+    .bind(Utc::now())
     .execute(&mut *transaction)
     .await
     .map_err(|e| e.to_string())?;
 
     // Получаем роль @everyone для этого сервера
-    let everyone_role_id: Option<i32> = sqlx::query_scalar!(
-        "SELECT id FROM roles WHERE guild_id = $1 AND name = '@everyone'",
-        main_guild_id
+    let everyone_role_id: Option<i32> = sqlx::query(
+        "SELECT id FROM roles WHERE guild_id = $1 AND name = '@everyone'"
     )
+    .bind(main_guild_id)
     .fetch_optional(&mut *transaction)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| e.to_string())?
+    .map(|row| row.get::<i32, _>(0));
 
     if let Some(role_id) = everyone_role_id {
         // Назначаем роль @everyone новому пользователю
-        sqlx::query!(
+        sqlx::query(
             "INSERT INTO member_roles (user_id, role_id, guild_id)
-             VALUES ($1, $2, $3)",
-            user_id,
-            role_id,
-            main_guild_id
+             VALUES ($1, $2, $3)"
         )
+        .bind(user_id)
+        .bind(role_id)
+        .bind(main_guild_id)
         .execute(&mut *transaction)
         .await
         .map_err(|e| e.to_string())?;
     }
 
     // Проверяем, является ли пользователь первым (владельцем)
-    let is_first_user: Option<bool> = sqlx::query_scalar!(
-        "SELECT EXISTS(SELECT 1 FROM guilds WHERE id = $1 AND owner_id = $2)",
-        main_guild_id,
-        user_id
+    let is_first_user: bool = sqlx::query(
+        "SELECT EXISTS(SELECT 1 FROM guilds WHERE id = $1 AND owner_id = $2)"
     )
+    .bind(main_guild_id)
+    .bind(user_id)
     .fetch_one(&mut *transaction)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| e.to_string())?
+    .get::<bool, _>(0);
 
     // Если пользователь - владелец, назначаем ему роль Admin
-    if is_first_user.unwrap_or(false) {
-        let admin_role_id: Option<i32> = sqlx::query_scalar!(
-            "SELECT id FROM roles WHERE guild_id = $1 AND name = 'Admin'",
-            main_guild_id
+    if is_first_user {
+        let admin_role_id: Option<i32> = sqlx::query(
+            "SELECT id FROM roles WHERE guild_id = $1 AND name = 'Admin'"
         )
+        .bind(main_guild_id)
         .fetch_optional(&mut *transaction)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())?
+        .map(|row| row.get::<i32, _>(0));
 
         if let Some(role_id) = admin_role_id {
-            sqlx::query!(
+            sqlx::query(
                 "INSERT INTO member_roles (user_id, role_id, guild_id)
                  VALUES ($1, $2, $3)
-                 ON CONFLICT (user_id, role_id, guild_id) DO NOTHING",
-                user_id,
-                role_id,
-                main_guild_id
+                 ON CONFLICT (user_id, role_id, guild_id) DO NOTHING"
             )
+            .bind(user_id)
+            .bind(role_id)
+            .bind(main_guild_id)
             .execute(&mut *transaction)
             .await
             .map_err(|e| e.to_string())?;
@@ -390,7 +401,7 @@ pub async fn handle_register(data: RegisterData) -> Result<(bool, i32), String> 
     .bind(main_guild_id)
     .bind(user_id)
     .bind(user_id)
-    .bind(audit_str)
+    .bind(&audit_str)
     .bind(Utc::now())
     .execute(&mut *transaction)
     .await
@@ -409,19 +420,19 @@ pub async fn handle_register(data: RegisterData) -> Result<(bool, i32), String> 
 pub async fn validate_session(session_token: &str) -> Option<ConnectionInfo> {
     let pool = get_db_pool();
 
-    let result = sqlx::query!(
+    let result = sqlx::query(
         "SELECT u.id, u.username FROM users u
         INNER JOIN websocket_sessions ws ON u.id = ws.user_id
-        WHERE ws.connection_id = $1 AND ws.status = 'active'",
-        session_token
+        WHERE ws.connection_id = $1 AND ws.status = 'active'"
     )
+    .bind(session_token)
     .fetch_optional(pool)
     .await
     .ok()?;
 
     result.map(|r| ConnectionInfo {
-        user_id: r.id,
-        username: r.username,
+        user_id: r.get::<i32, _>(0),
+        username: r.get::<String, _>(1),
         session_token: session_token.to_string(),
     })
 }
@@ -437,10 +448,10 @@ pub async fn handle_logout(
     let user_guilds = get_user_guilds_ids(user_id).await?;
     
     // Получаем информацию о пользователе
-    let user_info = sqlx::query!(
-        "SELECT username, avatar FROM users WHERE id = $1",
-        user_id
+    let user_info = sqlx::query(
+        "SELECT username, avatar FROM users WHERE id = $1"
     )
+    .bind(user_id)
     .fetch_optional(pool)
     .await
     .map_err(|e| e.to_string())?;
@@ -451,45 +462,45 @@ pub async fn handle_logout(
     
     // Закрываем сессию
     if let Some(token) = session_token {
-        sqlx::query!(
+        sqlx::query(
             "UPDATE websocket_sessions SET status = 'closed', disconnected_at = $1
-                WHERE user_id = $2 AND connection_id = $3 AND status = 'active'",
-            Utc::now(),
-            user_id,
-            token
+                WHERE user_id = $2 AND connection_id = $3 AND status = 'active'"
         )
+        .bind(Utc::now())
+        .bind(user_id)
+        .bind(&token)
         .execute(&mut *transaction)
         .await
         .map_err(|e| e.to_string())?;
     } else {
-        sqlx::query!(
+        sqlx::query(
             "UPDATE websocket_sessions SET status = 'closed', disconnected_at = $1
-                WHERE user_id = $2 AND status = 'active'",
-            Utc::now(),
-            user_id
+                WHERE user_id = $2 AND status = 'active'"
         )
+        .bind(Utc::now())
+        .bind(user_id)
         .execute(&mut *transaction)
         .await
         .map_err(|e| e.to_string())?;
     }
     
     // Проверяем другие активные сессии
-    let active_sessions: i64 = sqlx::query_scalar!(
-        "SELECT COUNT(*) FROM websocket_sessions WHERE user_id = $1 AND status = 'active'",
-        user_id
+    let active_sessions: i64 = sqlx::query(
+        "SELECT COUNT(*) FROM websocket_sessions WHERE user_id = $1 AND status = 'active'"
     )
+    .bind(user_id)
     .fetch_one(&mut *transaction)
     .await
     .map_err(|e| e.to_string())?
-    .unwrap_or(0);
+    .get::<i64, _>(0);
     
     // Обновляем статус только если нет других сессий
     if active_sessions == 0 {
-        sqlx::query!(
-            "UPDATE users SET status = 'offline', last_seen = $1, updated_at = $1 WHERE id = $2",
-            Utc::now(),
-            user_id
+        sqlx::query(
+            "UPDATE users SET status = 'offline', last_seen = $1, updated_at = $1 WHERE id = $2"
         )
+        .bind(Utc::now())
+        .bind(user_id)
         .execute(&mut *transaction)
         .await
         .map_err(|e| e.to_string())?;
@@ -502,11 +513,14 @@ pub async fn handle_logout(
     // Если нет других активных сессий, уведомляем об оффлайн статусе
     if active_sessions == 0 {
         if let Some(user) = user_info {
+            let username: String = user.get(0);
+            let avatar: Option<String> = user.get(1);
+            
             handle_notify_user_status_change(
                 &manager,
                 user_id,
-                &user.username,
-                &user.avatar,
+                &username,
+                &avatar,
                 "offline",
                 &user_guilds,
             ).await;
@@ -519,7 +533,6 @@ pub async fn handle_logout(
 pub async fn handle_get_current_user(session_token: &str) -> Result<serde_json::Value, String> {
     let pool = get_db_pool();
 
-    // Используем query вместо query! для Option типов
     let user = sqlx::query(
         "SELECT u.id, u.username, u.email, u.avatar, u.status, u.last_seen
         FROM users u
@@ -557,31 +570,34 @@ pub async fn handle_get_user_stats(user_id: i32) -> Result<serde_json::Value, St
     let pool = get_db_pool();
 
     // Получаем количество сообщений
-    let total_messages: i64 = sqlx::query_scalar(
+    let total_messages: i64 = sqlx::query(
         "SELECT COUNT(*) FROM messages WHERE user_id = $1"
     )
     .bind(user_id)
     .fetch_one(pool)
     .await
+    .map(|row| row.get::<i64, _>(0))
     .unwrap_or(0);
 
     // Получаем общее время в голосовых каналах
-    let total_voice_time: i64 = sqlx::query_scalar(
+    let total_voice_time: i64 = sqlx::query(
         "SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (left_at - joined_at))), 0)::bigint 
          FROM voice_activity_logs WHERE user_id = $1"
     )
     .bind(user_id)
     .fetch_one(pool)
     .await
+    .map(|row| row.get::<i64, _>(0))
     .unwrap_or(0);
 
     // Получаем количество гильдий
-    let total_guilds: i64 = sqlx::query_scalar(
+    let total_guilds: i64 = sqlx::query(
         "SELECT COUNT(*) FROM guild_members WHERE user_id = $1"
     )
     .bind(user_id)
     .fetch_one(pool)
     .await
+    .map(|row| row.get::<i64, _>(0))
     .unwrap_or(0);
 
     // Получаем информацию о пользователе
@@ -633,13 +649,14 @@ pub async fn handle_update_user_profile(
     if let (Some(current), Some(new)) = (current_password, new_password) {
         if !new.is_empty() {
             // Получаем текущий хеш пароля
-            let stored_hash: Option<String> = sqlx::query_scalar(
+            let stored_hash: Option<String> = sqlx::query(
                 "SELECT password_hash FROM users WHERE id = $1"
             )
             .bind(user_id)
             .fetch_one(&mut *transaction)
             .await
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| e.to_string())?
+            .get::<Option<String>, _>(0);
             
             if let Some(hash) = stored_hash {
                 let argon2 = Argon2::default();
