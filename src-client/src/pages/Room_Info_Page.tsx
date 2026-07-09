@@ -341,10 +341,9 @@ export function Room_Info_Page() {
                                 onChange={(e) => setEditData({...editData, room_type: e.target.value})}
                             >
                                 <option value="text">Текстовая</option>
-                                <option value="voice" disabled>Голосовая (скоро)</option>
+                                <option value="voice">Голосовая</option>
                                 <option value="video" disabled>Видео (скоро)</option>
                             </select>
-                            <small>Пока доступны только текстовые комнаты</small>
                         </div>
                         
                         <div className="form-group">
