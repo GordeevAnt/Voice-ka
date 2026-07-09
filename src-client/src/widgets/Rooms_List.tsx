@@ -262,7 +262,7 @@ export const Rooms_List = memo(({ guildId, currentRoomId, onRoomSelect }: RoomsL
                                     <Switch_Room_Button
                                         key={room.id}
                                         roomId={room.id}
-                                        name={`${room.name} ${room.member_count ? `(${room.member_count})` : ''}`}
+                                        name={`${room.name}`}
                                         isActive={currentRoomId === room.id}
                                         onSelect={onRoomSelect}
                                     />
