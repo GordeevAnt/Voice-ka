@@ -16,7 +16,7 @@ docker exec pp-gordeev-voice-ka-postgres pg_isready -U postgres
 echo Creating .env file...
 cd ..
 if not exist .env (
-    echo DATABASE_URL=postgres://gbilly_sysadmin:BillyJinn228@localhost:5432/Voice-ka_Local > .env
+    echo DATABASE_URL=postgres://gbilly_sysadmin:BillyJinn228@localhost:5433/Voice-ka_Local > .env
     echo .env created
 )
 
