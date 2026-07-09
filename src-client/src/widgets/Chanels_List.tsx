@@ -218,6 +218,7 @@ export function Chanels_List({ currentGuildId, onGuildSelect }: ChanelsListProps
                             icon={getIcon(guild.icon)}
                             isActive={currentGuildId === guild.id}
                             onSelect={handleGuildSelect}
+                            guildName={guild.name} // 👈 ПЕРЕДАЕМ ИМЯ ГИЛЬДИИ
                         />
                     ))}
                 </div>

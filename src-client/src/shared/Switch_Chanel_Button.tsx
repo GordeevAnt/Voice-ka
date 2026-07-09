@@ -8,6 +8,7 @@ interface SwitchChanelButtonProps {
     icon: string;
     isActive: boolean;
     onSelect: (guildId: number) => void;
+    guildName?: string;
 }
 
 interface UserRole {
@@ -21,14 +22,42 @@ export function Switch_Chanel_Button({
     guildId, 
     icon, 
     isActive, 
-    onSelect 
+    onSelect,
+    guildName = ""
 }: SwitchChanelButtonProps) {
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
     const [userPermissions, setUserPermissions] = useState<number>(0);
     const [isLoadingRoles, setIsLoadingRoles] = useState(false);
     const [hasAdminAccess, setHasAdminAccess] = useState(false);
 
-    // Загружаем роли пользователя при монтировании или изменении guildId
+    // Функция для получения инициалов
+    const getInitials = (name: string) => {
+        if (!name) return "?";
+        return name
+            .split(' ')
+            .map(word => word[0])
+            .join('')
+            .toUpperCase()
+            .slice(0, 2);
+    };
+
+    // Функция для получения цвета аватара
+    const getAvatarColor = (name: string) => {
+        const colors = [
+            '#1abc9c', '#2ecc71', '#3498db', '#9b59b6', '#34495e',
+            '#16a085', '#27ae60', '#2980b9', '#8e44ad', '#2c3e50',
+            '#f1c40f', '#e67e22', '#e74c3c', '#95a5a6', '#f39c12',
+            '#d35400', '#c0392b', '#bdc3c7', '#7f8c8d'
+        ];
+        
+        let hash = 0;
+        for (let i = 0; i < name.length; i++) {
+            hash = name.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        return colors[Math.abs(hash) % colors.length];
+    };
+
+    // Загружаем роли пользователя
     useEffect(() => {
         const loadUserRoles = async () => {
             setIsLoadingRoles(true);
@@ -41,28 +70,24 @@ export function Switch_Chanel_Button({
 
                 console.log(`📋 Loading roles for user ${userId} in guild ${guildId}`);
                 
-                // Получаем роли пользователя в гильдии
                 const roles = await apiService.getUserRolesInGuild(userId, guildId);
                 console.log(`✅ Loaded roles:`, roles);
                 
                 setUserRoles(roles);
                 
-                // Вычисляем общие права (суммируем права всех ролей)
                 let totalPermissions = 0;
                 for (const role of roles) {
                     totalPermissions |= role.permissions;
                 }
                 setUserPermissions(totalPermissions);
                 
-                // Проверяем наличие административных прав
                 const hasAdmin = roles.some(role => 
                     role.name === 'Admin' || 
                     role.name === 'admin' ||
-                    (role.permissions & 0x8) !== 0 // Бит администратора
+                    (role.permissions & 0x8) !== 0
                 );
                 setHasAdminAccess(hasAdmin);
                 
-                // Сохраняем данные о ролях в хранилище для текущей гильдии
                 await storeAPI.set(`guild_${guildId}_user_roles`, {
                     roles: roles,
                     permissions: totalPermissions,
@@ -86,7 +111,6 @@ export function Switch_Chanel_Button({
     const handleClick = async () => {
         console.log(`🔄 Switch_Chanel_Button clicked: switching to guild ${guildId}`);
         
-        // При переключении канала сохраняем текущие роли в глобальное хранилище
         try {
             const userId = await storeAPI.get<number>('user_id');
             if (userId) {
@@ -116,14 +140,30 @@ export function Switch_Chanel_Button({
         return classes;
     };
 
+    // Проверяем, есть ли иконка
+    const hasIcon = icon && icon !== "/voice-ka.svg";
+    
+    // Получаем цвет для кнопки
+    const avatarColor = getAvatarColor(guildName || `guild-${guildId}`);
+
     return (
         <button 
             id={`guild-${guildId}`} 
             className={getButtonClass()}
             onClick={handleClick}
             disabled={isActive || isLoadingRoles}
+            style={{ '--hover-color': avatarColor } as React.CSSProperties}
         >
-            <img src={icon} alt={`Channel ${guildId}`} />
+            {hasIcon ? (
+                <img src={icon} alt={`Channel ${guildId}`} />
+            ) : (
+                <div 
+                    className="switch-chanel-initials"
+                    style={{ backgroundColor: avatarColor }}
+                >
+                    {getInitials(guildName || `guild-${guildId}`)}
+                </div>
+            )}
         </button>
     )
 }
